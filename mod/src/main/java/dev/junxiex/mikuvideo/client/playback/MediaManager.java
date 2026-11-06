@@ -12,6 +12,7 @@ import dev.junxiex.mikuvideo.client.net.ClientNetworking;
 import dev.junxiex.mikuvideo.client.net.ClockSync;
 import dev.junxiex.mikuvideo.client.screen.ClientScreen;
 import dev.junxiex.mikuvideo.client.screen.ScreenRegistry;
+import dev.junxiex.mikuvideo.client.util.ClientUrls;
 import dev.junxiex.mikuvideo.protocol.Message;
 import dev.junxiex.mikuvideo.protocol.Playback;
 import dev.junxiex.mikuvideo.protocol.ScreenInfo;
@@ -104,6 +105,14 @@ public final class MediaManager {
             return;
         }
         ScreenInfo info = screen.info();
+        if (!ClientUrls.isAllowed(playback.url(), config.allowPrivateHosts)) {
+            screen.setMediaState(MediaState.ERROR, "客户端拒绝本机/内网地址");
+            if (screen.shouldReportError(playback.url())) {
+                screen.markErrorReported(playback.url());
+                ClientNetworking.send(new Message.MediaErrorC2S(info.id(), 6, "客户端拒绝本机/内网地址"));
+            }
+            return;
+        }
         long serverNow = ClockSync.serverNow();
         long expected = playback.positionAt(serverNow);
         if (playback.durationMillis() > 0L) {
