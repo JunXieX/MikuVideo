@@ -28,11 +28,16 @@ public final class ScreenPicker {
                 continue;
             }
             Vec3 normal = new Vec3(info.nx(), info.ny(), info.nz());
+            Vec3 eyeToCenter = new Vec3(info.x() - eye.x, info.y() - eye.y, info.z() - eye.z);
             double denominator = direction.dot(normal);
             if (Math.abs(denominator) < 1.0E-5) {
                 continue;
             }
-            Vec3 toCenter = new Vec3(info.x() - eye.x, info.y() - eye.y, info.z() - eye.z);
+            // 只有站在屏幕正面才允许选中，避免从墙背面隔空开菜单。
+            if (eyeToCenter.dot(normal) >= 0.0) {
+                continue;
+            }
+            Vec3 toCenter = eyeToCenter;
             double distance = toCenter.dot(normal) / denominator;
             if (distance <= 0.0 || distance > maxDistance) {
                 continue;

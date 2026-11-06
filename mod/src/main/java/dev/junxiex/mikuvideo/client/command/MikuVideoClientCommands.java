@@ -6,7 +6,6 @@ import dev.junxiex.mikuvideo.client.MikuVideoClient;
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
 import dev.junxiex.mikuvideo.client.media.FfmpegMediaEngine;
 import dev.junxiex.mikuvideo.client.media.MediaEngine;
-import dev.junxiex.mikuvideo.client.net.ClockSync;
 import dev.junxiex.mikuvideo.client.screen.ScreenRegistry;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
@@ -28,11 +27,10 @@ public final class MikuVideoClientCommands {
                     .then(ClientCommands.literal("status").executes(ctx -> {
                         FabricClientCommandSource source = ctx.getSource();
                         ClientConfig config = MikuVideoClient.config();
-                        info(source, "解码引擎: " + MikuVideoClient.media().engine().statusText());
+                        statusAsync(source);
                         info(source, "屏幕数: " + ScreenRegistry.INSTANCE.size()
                                 + "，同时解码上限: " + config.maxActiveStreams
-                                + "，音量: " + config.masterVolume
-                                + "，RTT: " + ClockSync.rttMillis() + "ms");
+                                + "，音量: " + config.masterVolume);
                         return 1;
                     }))
                     .then(ClientCommands.literal("volume")
@@ -70,7 +68,7 @@ public final class MikuVideoClientCommands {
                                             ffmpegEngine.reload();
                                         }
                                         info(ctx.getSource(), "ffmpeg 路径已设为: " + path);
-                                        info(ctx.getSource(), engine.statusText());
+                                        statusAsync(ctx.getSource());
                                         return 1;
                                     })))
                     .then(ClientCommands.literal("download").executes(ctx -> {
@@ -105,11 +103,17 @@ public final class MikuVideoClientCommands {
                         MikuVideoClient.reloadConfig();
                         FabricClientCommandSource source = ctx.getSource();
                         info(source, "配置已重新载入");
-                        info(source, MikuVideoClient.media().engine().statusText());
+                        statusAsync(source);
                         return 1;
                     }));
             dispatcher.register(root);
         });
+    }
+
+    /** 状态文本涉及磁盘/PATH 探测，放到后台算完再回主线程打印。 */
+    private static void statusAsync(FabricClientCommandSource source) {
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> MikuVideoClient.media().engine().statusText())
+                .thenAccept(text -> source.getClient().execute(() -> info(source, "解码引擎: " + text)));
     }
 
     private static void info(FabricClientCommandSource source, String text) {

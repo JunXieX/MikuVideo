@@ -56,6 +56,9 @@ public final class ScreenRenderer {
                 continue;
             }
             RenderType renderType = screen.renderType();
+            if (renderType == null) {
+                continue;
+            }
             float halfWidth = info.width() / 2.0F;
             float halfHeight = info.height() / 2.0F;
             float rightX = info.rx();

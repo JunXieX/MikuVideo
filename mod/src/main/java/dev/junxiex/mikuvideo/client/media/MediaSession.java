@@ -28,6 +28,11 @@ public interface MediaSession extends AutoCloseable {
         return 0L;
     }
 
+    /** 是否已经播放到结尾（EOF）。默认后端不区分。 */
+    default boolean isEnded() {
+        return false;
+    }
+
     @Override
     void close();
 }

@@ -10,6 +10,7 @@ import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * 定位可用的 ffmpeg 可执行文件。
@@ -36,9 +37,10 @@ public final class FfmpegLocator {
     private static final int PROBE_MAX_BYTES = 64 * 1024;
 
     private final Path gameDir;
-    private final Object lock = new Object();
+    private final ReentrantLock scanLock = new ReentrantLock();
 
     private volatile String explicitPath;
+    private volatile long generation;
     private volatile Path cached;
     private volatile boolean attempted;
     private volatile String version = "";
@@ -85,17 +87,13 @@ public final class FfmpegLocator {
 
     /** 设置显式路径；传空表示清除。支持直接给可执行文件或它所在的目录。 */
     public void setPath(String path) {
-        synchronized (lock) {
-            this.explicitPath = path == null || path.isBlank() ? null : path.strip();
-            resetLocked();
-        }
+        this.explicitPath = path == null || path.isBlank() ? null : path.strip();
+        invalidate();
     }
 
     /** 清空缓存，下次 {@link #locate()} 重新按顺序探测。 */
     public void reload() {
-        synchronized (lock) {
-            resetLocked();
-        }
+        invalidate();
     }
 
     /**
@@ -108,17 +106,28 @@ public final class FfmpegLocator {
         if (attempted) {
             return cached;
         }
-        synchronized (lock) {
+        // 另一个线程正在扫描时不阻塞调用方：主线程只拿缓存，扫描完成后下次调用自然命中。
+        if (!scanLock.tryLock()) {
+            return cached;
+        }
+        try {
             if (attempted) {
                 return cached;
             }
+            long scanGeneration = generation;
             Path found = scan();
+            if (scanGeneration != generation) {
+                // 扫描期间被 setPath/reload 作废，丢弃这次结果。
+                return cached;
+            }
             cached = found;
             attempted = true;
             if (found == null && failure.isEmpty()) {
                 failure = "未在任何位置找到 ffmpeg";
             }
             return found;
+        } finally {
+            scanLock.unlock();
         }
     }
 
@@ -149,11 +158,12 @@ public final class FfmpegLocator {
         return "ffmpeg " + (v.isEmpty() ? "" : v + " ") + "[" + found + "]";
     }
 
-    private void resetLocked() {
+    private void invalidate() {
         cached = null;
         attempted = false;
         version = "";
         failure = "";
+        generation++;
     }
 
     private Path scan() {
@@ -283,7 +293,7 @@ public final class FfmpegLocator {
             builder.redirectErrorStream(true);
             process = builder.start();
             final Process started = process;
-            final StringBuilder sink = new StringBuilder();
+            final StringBuffer sink = new StringBuffer();
             Thread drain = MediaThreads.daemon("probe", () -> sink.append(readAll(started.getInputStream(), PROBE_MAX_BYTES)));
             drain.setDaemon(true);
             drain.start();

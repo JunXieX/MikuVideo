@@ -19,6 +19,9 @@ public final class Protocol {
     /** 单条插件消息上限（原版 CustomPayload 上限为 1 MiB，这里留出余量）。 */
     public static final int MAX_MESSAGE_BYTES = 1024 * 1024;
 
+    /** 客户端 -> 服务端单包上限（Minecraft 的 ServerboundCustomPayloadPacket 上限 32767 字节）。 */
+    public static final int MAX_C2S_MESSAGE_BYTES = 32767;
+
     public static final int MAX_SCREEN_ID = 32;
     public static final int MAX_SCREEN_NAME = 64;
     public static final int MAX_WORLD_KEY = 128;

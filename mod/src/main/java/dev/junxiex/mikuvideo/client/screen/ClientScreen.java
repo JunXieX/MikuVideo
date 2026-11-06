@@ -12,6 +12,7 @@ import net.minecraft.client.renderer.rendertype.RenderTypes;
 import net.minecraft.resources.Identifier;
 
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 /** 客户端持有的一块屏幕：几何、播放状态、视频帧与纹理。 */
 public final class ClientScreen {
@@ -31,6 +32,11 @@ public final class ClientScreen {
     private int textureWidth = -1;
     private int textureHeight = -1;
     private RenderType renderType;
+    private Identifier cachedTextureId;
+    private String cachedTextureSource;
+
+    private String endedUrl = "";
+    private long endedPosition;
 
     /** 由解码预算计算出的相机距离平方，仅由客户端线程写入。 */
     public volatile double distanceSq;
@@ -60,11 +66,15 @@ public final class ClientScreen {
         Playback next = playback == null ? Playback.stopped() : playback;
         Playback previous = this.playback;
         boolean urlChanged = previous == null || !previous.url().equals(next.url());
+        boolean jumped = previous != null && Math.abs(next.positionMillis() - previous.positionMillis()) > 2_000L;
         this.playback = next;
         if (urlChanged) {
             this.reportedDurationUrl = "";
             this.reportedErrorKey = "";
             this.failureCount = 0;
+        }
+        if (urlChanged || jumped || next.isStopped()) {
+            clearEnded();
         }
     }
 
@@ -78,14 +88,42 @@ public final class ClientScreen {
     }
 
     public Identifier textureId() {
-        return Identifier.fromNamespaceAndPath("mikuvideo", "screen/" + info.id());
+        String source = info.id();
+        if (cachedTextureId == null || !source.equals(cachedTextureSource)) {
+            cachedTextureSource = source;
+            cachedTextureId = Identifier.fromNamespaceAndPath("mikuvideo", "screen/" + safePath(source));
+        }
+        return cachedTextureId;
     }
 
     public RenderType renderType() {
         if (renderType == null) {
-            renderType = RenderTypes.entityTranslucentEmissive(textureId());
+            try {
+                renderType = RenderTypes.entityTranslucentEmissive(textureId());
+            } catch (RuntimeException error) {
+                return null;
+            }
         }
         return renderType;
+    }
+
+    /** 把任意 id 编码成 Identifier 允许的 path，避免非法字符把渲染线程打崩。 */
+    private static String safePath(String id) {
+        String value = id == null ? "" : id.toLowerCase(Locale.ROOT);
+        StringBuilder builder = new StringBuilder(Math.min(48, value.length()));
+        for (int i = 0; i < value.length() && builder.length() < 48; i++) {
+            char c = value.charAt(i);
+            if ((c >= 'a' && c <= 'z') || (c >= '0' && c <= '9')
+                    || c == '.' || c == '_' || c == '-' || c == '/') {
+                builder.append(c);
+            } else {
+                builder.append('_');
+            }
+        }
+        if (builder.length() == 0) {
+            builder.append("screen");
+        }
+        return builder.append('-').append(Integer.toHexString(value.hashCode())).toString();
     }
 
     public void offerFrame(ByteBuffer source, int width, int height) {
@@ -148,11 +186,29 @@ public final class ClientScreen {
         if (texture != null && textureWidth == width && textureHeight == height) {
             return;
         }
+        Identifier id = textureId();
         if (texture != null) {
-            minecraft.getTextureManager().release(textureId());
+            minecraft.getTextureManager().release(id);
+            texture = null;
+            renderType = null;
         }
-        texture = new VideoTexture("MikuVideo screen " + info.id(), width, height);
-        minecraft.getTextureManager().register(textureId(), texture);
+        VideoTexture created = null;
+        try {
+            created = new VideoTexture("MikuVideo screen " + info.id(), width, height);
+            minecraft.getTextureManager().register(id, created);
+        } catch (RuntimeException error) {
+            if (created != null) {
+                try {
+                    created.close();
+                } catch (RuntimeException ignored) {
+                }
+            }
+            textureWidth = -1;
+            textureHeight = -1;
+            renderType = null;
+            return;
+        }
+        texture = created;
         textureWidth = width;
         textureHeight = height;
         renderType = null;
@@ -185,6 +241,21 @@ public final class ClientScreen {
 
     public void resetFailures() {
         failureCount = 0;
+    }
+
+    public boolean isEnded(String url) {
+        return url != null && !url.isBlank() && url.equals(endedUrl);
+    }
+
+    public void markEnded(String url, long positionMillis) {
+        this.endedUrl = url == null ? "" : url;
+        this.endedPosition = positionMillis;
+        setMediaState(MediaState.PAUSED, "播放结束");
+    }
+
+    public void clearEnded() {
+        this.endedUrl = "";
+        this.endedPosition = 0L;
     }
 
     public long expectedPositionMillis(long serverNow) {
@@ -243,5 +314,13 @@ public final class ClientScreen {
             minecraft.getTextureManager().release(textureId());
             texture = null;
         }
+        synchronized (frameLock) {
+            staging = null;
+            frameWidth = 0;
+            frameHeight = 0;
+            frameSequence = 0L;
+            uploadedSequence = 0L;
+        }
+        renderType = null;
     }
 }

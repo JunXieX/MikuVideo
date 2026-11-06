@@ -104,6 +104,10 @@ public final class MediaManager {
             close(screen.info().id());
             return;
         }
+        if (screen.isEnded(playback.url())) {
+            close(screen.info().id());
+            return;
+        }
         ScreenInfo info = screen.info();
         if (!ClientUrls.isAllowed(playback.url(), config.allowPrivateHosts)) {
             screen.setMediaState(MediaState.ERROR, "客户端拒绝本机/内网地址");
@@ -140,7 +144,6 @@ public final class MediaManager {
             if (playback.paused()) {
                 session.pause();
             }
-            screen.resetFailures();
         }
         MediaSession session = entry.session;
         float distance = (float) Math.sqrt(Math.max(0.0, screen.distanceSq));
@@ -153,6 +156,11 @@ public final class MediaManager {
             session.resume();
         }
 
+        if (session.isEnded() || (playback.durationMillis() > 0L && expected >= playback.durationMillis())) {
+            screen.markEnded(playback.url(), expected);
+            close(info.id());
+            return;
+        }
         long now = System.currentTimeMillis();
         if (!playback.paused() && entry.lastSeekAt + SEEK_COOLDOWN_MS < now) {
             long actual = session.positionMillis();

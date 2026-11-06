@@ -38,6 +38,10 @@ public final class ClientNetworking {
         helloPending = false;
     }
 
+    public static void stopHello() {
+        helloPending = false;
+    }
+
     public static void tick(Minecraft minecraft) {
         if (minecraft.level == null || minecraft.player == null) {
             return;
@@ -72,7 +76,12 @@ public final class ClientNetworking {
             if (!ClientPlayNetworking.canSend(ModPayload.TYPE)) {
                 return;
             }
-            ClientPlayNetworking.send(new ModPayload(MessageCodec.encode(message)));
+            byte[] encoded = MessageCodec.encode(message);
+            if (encoded.length > Protocol.MAX_C2S_MESSAGE_BYTES) {
+                MikuVideoClient.LOGGER.warn("客户端消息超过服务端单包上限: {} 字节", encoded.length);
+                return;
+            }
+            ClientPlayNetworking.send(new ModPayload(encoded));
         } catch (RuntimeException e) {
             MikuVideoClient.LOGGER.warn("发送 MikuVideo 消息失败: {}", e.getMessage());
         }

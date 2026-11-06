@@ -36,3 +36,5 @@ replay_*.log
 logs/
 *.log
 ffmpeg/
+# deliverables
+dist/

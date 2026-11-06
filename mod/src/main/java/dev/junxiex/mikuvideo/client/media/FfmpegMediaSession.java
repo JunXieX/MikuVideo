@@ -154,6 +154,7 @@ public final class FfmpegMediaSession implements MediaSession {
     private volatile float volume = 1.0f;
     private volatile boolean paused;
     private volatile boolean closed;
+    private volatile boolean ended;
 
     private volatile Run run;
     private volatile long basePositionMs;
@@ -186,6 +187,7 @@ public final class FfmpegMediaSession implements MediaSession {
         if (run == null && engine.locator().isResolved() && engine.executable() == null) {
             this.request = request;
             this.paused = false;
+            this.ended = false;
             this.basePositionMs = request.startPositionMillis();
             this.consumedFrames.set(0L);
             this.durationMs = 0L;
@@ -264,6 +266,7 @@ public final class FfmpegMediaSession implements MediaSession {
                 return;
             }
             paused = false;
+            ended = false;
             releasePauseTimer();
             Run current = this.run;
             if (current == null) {
@@ -302,6 +305,7 @@ public final class FfmpegMediaSession implements MediaSession {
             long target = Math.max(0L, positionMillis);
             releasePauseTimer();
             paused = false;
+            ended = false;
             Run previous = this.run;
             this.run = null;
             if (previous != null) {
@@ -401,6 +405,11 @@ public final class FfmpegMediaSession implements MediaSession {
     @Override
     public long durationMillis() {
         return durationMs;
+    }
+
+    @Override
+    public boolean isEnded() {
+        return ended;
     }
 
     /** 当前 run 已呈现的帧数。 */
@@ -572,6 +581,8 @@ public final class FfmpegMediaSession implements MediaSession {
             return;
         }
         this.run = null;
+        this.paused = true;
+        this.ended = true;
         int exit = waitExit(current.videoProcess, 600L);
         String tail = current.videoStderr.tail(STDERR_LINES);
         if (tail.isEmpty() && current.failure != null) {

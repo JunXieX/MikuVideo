@@ -29,21 +29,20 @@ import org.slf4j.LoggerFactory;
 /** 客户端入口：网络、渲染、解码预算与交互。 */
 public final class MikuVideoClient implements ClientModInitializer {
     public static final Logger LOGGER = LoggerFactory.getLogger("MikuVideo");
-    private static final int STATUS_INTERVAL_TICKS = 10;
+    private static final int STATUS_INTERVAL_TICKS = 40;
 
     private static ClientConfig config = new ClientConfig();
     private static boolean warnedMissingFfmpeg;
     private KeyMapping interactKey;
     private int tickCounter;
+    private String lastOverlay = "";
 
     @Override
     public void onInitializeClient() {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
-        if (media().engine() instanceof dev.junxiex.mikuvideo.client.media.FfmpegMediaEngine ffmpegEngine) {
-            ffmpegEngine.prewarm();
-        }
+        startFfmpegInit();
 
         ScreenRenderer.register();
         ClientNetworking.register();
@@ -66,11 +65,23 @@ public final class MikuVideoClient implements ClientModInitializer {
             ClockSync.reset();
         });
 
-        if (!media().engine().isAvailable()) {
-            LOGGER.warn("FFmpeg 不可用: {}", media().engine().statusText());
-        } else {
-            LOGGER.info("FFmpeg 就绪: {}", media().engine().statusText());
-        }
+    }
+
+    /** 在后台完成首次定位，避免主线程卡在 PATH/磁盘扫描上。 */
+    private static void startFfmpegInit() {
+        Thread thread = new Thread(() -> {
+            try {
+                if (media().engine().isAvailable()) {
+                    LOGGER.info("FFmpeg 就绪: {}", media().engine().statusText());
+                } else {
+                    LOGGER.warn("FFmpeg 不可用: {}", media().engine().statusText());
+                }
+            } catch (RuntimeException error) {
+                LOGGER.warn("FFmpeg 初始化检查失败: {}", error.getMessage());
+            }
+        }, "mikuvideo-ffmpeg-init");
+        thread.setDaemon(true);
+        thread.start();
     }
 
     public static ClientConfig config() {
@@ -111,7 +122,13 @@ public final class MikuVideoClient implements ClientModInitializer {
         if (tickCounter % STATUS_INTERVAL_TICKS == 0) {
             ScreenPicker.Hit hit = ScreenPicker.pick(minecraft, 32.0);
             if (hit != null) {
-                minecraft.player.sendOverlayMessage(Component.literal(hit.screen().statusText(config)));
+                String text = hit.screen().statusText(config);
+                if (!text.equals(lastOverlay)) {
+                    lastOverlay = text;
+                    minecraft.player.sendOverlayMessage(Component.literal(text));
+                }
+            } else {
+                lastOverlay = "";
             }
         }
     }
@@ -141,11 +158,15 @@ public final class MikuVideoClient implements ClientModInitializer {
                 media().closeAll();
             }
             case Message.NoticeS2C notice -> {
+                if (notice.level() >= Protocol.NOTICE_ERROR) {
+                    ClientNetworking.stopHello();
+                }
                 if (minecraft.player != null) {
                     ChatFormatting color = notice.level() >= Protocol.NOTICE_ERROR ? ChatFormatting.RED
                             : notice.level() == Protocol.NOTICE_WARN ? ChatFormatting.YELLOW : ChatFormatting.GRAY;
+                    String text = notice.message().replaceAll("<[^>]+>", "");
                     minecraft.player.sendSystemMessage(Component.literal("[MikuVideo] ").withStyle(ChatFormatting.AQUA)
-                            .append(Component.literal(notice.message()).withStyle(color)));
+                            .append(Component.literal(text).withStyle(color)));
                 }
             }
             case Message.PingS2C ping -> ClientNetworking.send(new Message.PongC2S(ping.id(), System.currentTimeMillis()));
