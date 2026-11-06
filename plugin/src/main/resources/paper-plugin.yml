@@ -1,0 +1,8 @@
+name: MikuVideo
+version: '${version}'
+main: dev.junxiex.mikuvideo.MikuVideoPlugin
+api-version: '26.3'
+authors:
+  - JunXieX
+description: 服务端权威的视频屏幕同步插件，需要配套客户端模组。
+folia-supported: true

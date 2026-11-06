@@ -1,0 +1,64 @@
+name: release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v5
+
+      - name: Grant execute permission
+        run: chmod +x ./gradlew
+
+      - name: Verify tag matches version
+        run: |
+          VERSION="$(grep -oP '^version=\K.*' gradle.properties)"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "tag $TAG 与 gradle.properties 的 version $VERSION 不一致" >&2
+            exit 1
+          fi
+
+      - name: Build
+        run: ./gradlew build --no-daemon
+
+      - name: Collect jars
+        run: |
+          mkdir -p dist
+          cp plugin/build/libs/MikuVideo-*.jar dist/
+          cp mod/build/libs/MikuVideo-Client-*.jar dist/
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            echo "Release ${GITHUB_REF_NAME} 已存在，跳过。"
+            exit 0
+          fi
+          NOTES_FILE="$(mktemp)"
+          git log -1 --format=%b HEAD > "${NOTES_FILE}"
+          if [ -s "${NOTES_FILE}" ]; then
+            gh release create "${GITHUB_REF_NAME}" dist/*.jar --title "${GITHUB_REF_NAME}" --notes-file "${NOTES_FILE}"
+          else
+            gh release create "${GITHUB_REF_NAME}" dist/*.jar --title "${GITHUB_REF_NAME}" --generate-notes
+          fi

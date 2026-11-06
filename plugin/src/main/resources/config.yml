@@ -1,0 +1,70 @@
+# ============================================================
+# MikuVideo 服务端配置
+# 所有数值在读入时都会夹取到合理范围，写错不会导致启动失败。
+# 文本类配置支持 MiniMessage 格式，例如 <green>、<gradient:#66ccff:#ff99ff>
+# ============================================================
+
+limits:
+  # 单个玩家最多能创建多少块屏幕；拥有 mikuvideo.limit.unlimited 的玩家不受限制
+  max-screens-per-player: 8
+  # 屏幕尺寸的下限（格）
+  min-screen-width: 0.5
+  min-screen-height: 0.5
+  # 屏幕尺寸的上限（格）
+  max-screen-width: 16.0
+  max-screen-height: 9.0
+  # 全服屏幕总数上限，同时受协议上限 512 约束
+  max-total-screens: 512
+
+sync:
+  # 玩家能看到多远的屏幕，按屏幕中心点到玩家眼睛的距离计算（格）
+  view-distance: 64.0
+  # 每隔多少 tick 重新对比一次玩家可见屏幕集合（20 tick = 1 秒）
+  rescan-interval-ticks: 10
+  # 正在播放且附近有人的屏幕，每隔多少毫秒重播一次时间线用于纠偏
+  rebroadcast-interval-ms: 5000
+  # 点击播放后先进入缓冲态多久再开始计时（毫秒），给客户端留出起播时间
+  start-hold-ms: 3000
+  # 同一玩家的命令冷却（毫秒）
+  command-cooldown-ms: 150
+  # 心跳间隔（毫秒）；客户端超时只做标记，不会踢人
+  ping-interval-ms: 30000
+
+media:
+  # 是否允许指向本机 / 内网的地址
+  # false 时拒绝 localhost、127.0.0.0/8、10/8、172.16/12、192.168/16、169.254/16、
+  # ::1、fc00::/7、fe80::/10 以及 .local 结尾的主机；只做字面量判断，不做 DNS 解析
+  allow-private-hosts: false
+  # 允许的协议
+  allowed-schemes:
+    - http
+    - https
+  # 主机黑名单，支持精确匹配与 *.example.com 通配
+  blocked-hosts: []
+  # 链接最大长度（字符），上限受协议约束为 4096
+  max-url-length: 1024
+  # 单次播放最多携带多少个请求头，上限受协议约束为 16
+  max-headers: 8
+  # 允许透传的请求头名（大小写不敏感）
+  allowed-header-names:
+    - Referer
+    - User-Agent
+    - Origin
+    - Cookie
+    - Authorization
+
+storage:
+  # 写盘合并延迟（毫秒）：短时间内的多次改动只落盘一次
+  save-debounce-ms: 1500
+
+messages:
+  # 所有命令反馈的前缀
+  prefix: '<gradient:#66ccff:#ff99ff>[MikuVideo]</gradient> '
+  # 提示玩家去哪里下载客户端模组
+  client-download-url: 'https://github.com/JunXieX/MikuVideo/releases'
+  # 玩家没装模组时的提示
+  no-client: '<red>未检测到客户端模组，请安装 MikuVideo 客户端模组后重新进入服务器。'
+  # 权限不足
+  no-permission: '<red>你没有权限执行该操作。'
+  # 找不到屏幕
+  screen-not-found: '<red>找不到该屏幕，请用 /mv list 查看可用屏幕。'

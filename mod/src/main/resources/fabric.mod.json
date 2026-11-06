@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "id": "mikuvideo",
+  "version": "${version}",
+  "name": "MikuVideo Client",
+  "description": "MikuVideo 客户端：在服务器内的屏幕上直接解码并播放网络视频，视频流量不经过服务器。",
+  "authors": [
+    "JunXieX"
+  ],
+  "license": "All Rights Reserved",
+  "icon": "assets/mikuvideo/icon.png",
+  "environment": "client",
+  "entrypoints": {
+    "client": [
+      "dev.junxiex.mikuvideo.client.MikuVideoClient"
+    ]
+  },
+  "depends": {
+    "fabricloader": ">=0.20.1",
+    "minecraft": "~26.3",
+    "java": ">=25",
+    "fabric-api": "*"
+  }
+}
