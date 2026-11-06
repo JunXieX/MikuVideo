@@ -42,6 +42,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
+        media().resolver().setYtDlpPath(config.ytDlpPath);
         startFfmpegInit();
 
         ScreenRenderer.register();
@@ -76,6 +77,7 @@ public final class MikuVideoClient implements ClientModInitializer {
                 } else {
                     LOGGER.warn("FFmpeg 不可用: {}", media().engine().statusText());
                 }
+                LOGGER.info("网页解析器: {}", media().resolver().statusText());
             } catch (RuntimeException error) {
                 LOGGER.warn("FFmpeg 初始化检查失败: {}", error.getMessage());
             }
@@ -92,6 +94,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
+        media().resolver().setYtDlpPath(config.ytDlpPath);
     }
 
     public static MediaManager media() {

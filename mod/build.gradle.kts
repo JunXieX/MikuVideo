@@ -46,6 +46,17 @@ val bundledFfmpegPlatforms = (providers.gradleProperty("bundled_ffmpeg_platforms
         .map { it.trim() }
         .filter { it.isNotEmpty() }
 
+val ytdlpPlatforms = (providers.gradleProperty("bundled_ytdlp_platforms").orNull
+        ?: "windows-x64,linux-x64")
+        .split(',')
+        .map { it.trim() }
+        .filter { it.isNotEmpty() }
+
+val ytdlpSources = mapOf(
+        "windows-x64" to "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp.exe",
+        "linux-x64" to "https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp_linux"
+)
+
 val ffmpegSources = mapOf(
         "windows-x64" to "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-win64-gpl-9.0.zip",
         "linux-x64" to "https://github.com/BtbN/FFmpeg-Builds/releases/download/latest/ffmpeg-n9.0-latest-linux64-gpl-9.0.tar.xz"
@@ -92,7 +103,40 @@ val prepareBundledFfmpeg = tasks.register("prepareBundledFfmpeg") {
     }
 }
 
+val prepareBundledYtDlp = tasks.register("prepareBundledYtDlp") {
+    outputs.dir(generatedFfmpegDir)
+    doLast {
+        for (platform in ytdlpPlatforms) {
+            val url = ytdlpSources[platform]
+            if (url == null) {
+                println("没有为平台 " + platform + " 配置 yt-dlp 下载地址，跳过")
+                continue
+            }
+            val binary = File(ffmpegCacheDir, "yt-dlp-" + platform + (if (platform.startsWith("windows")) ".exe" else ""))
+            if (!binary.isFile || binary.length() == 0L) {
+                println("下载 yt-dlp " + platform + ": " + url)
+                binary.parentFile.mkdirs()
+                URI(url).toURL().openStream().use { input ->
+                    binary.outputStream().use { output -> input.copyTo(output) }
+                }
+            }
+            val target = File(generatedFfmpegDir, "mikuvideo/ytdlp/$platform.zip")
+            if (target.isFile && target.length() > 1_048_576L) {
+                continue
+            }
+            target.parentFile.mkdirs()
+            ZipOutputStream(target.outputStream().buffered()).use { zip ->
+                zip.putNextEntry(ZipEntry(binary.name))
+                binary.inputStream().use { input -> input.copyTo(zip) }
+                zip.closeEntry()
+            }
+            println("内置 yt-dlp " + platform + ": " + (target.length() / 1024 / 1024) + " MB")
+        }
+    }
+}
+
 sourceSets.main {
+    // 两个任务都写入同一个生成目录；这里只声明一次，避免资源重复。
     resources.srcDir(prepareBundledFfmpeg)
 }
 
@@ -143,6 +187,7 @@ tasks.jar {
 
 tasks.processResources {
     dependsOn(prepareBundledFfmpeg)
+    dependsOn(prepareBundledYtDlp)
     val version = project.version
     inputs.property("version", version)
     filteringCharset = "UTF-8"

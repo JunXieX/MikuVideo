@@ -30,6 +30,10 @@ public final class ClientConfig {
     public boolean allowPrivateHosts = false;
     public boolean debug = false;
     public String ffmpegPath = "";
+    public String ytDlpPath = "";
+    public String cookiesFile = "";
+    public String proxy = "";
+    public int qualityHeight = 1080;
 
     public static ClientConfig load() {
         file = FabricLoader.getInstance().getConfigDir().resolve("mikuvideo.json");
@@ -61,8 +65,18 @@ public final class ClientConfig {
             viewDistance = 96.0;
         }
         viewDistance = Math.max(8.0, Math.min(512.0, viewDistance));
+        qualityHeight = clamp(qualityHeight, 144, 2160);
         if (ffmpegPath == null) {
             ffmpegPath = "";
+        }
+        if (ytDlpPath == null) {
+            ytDlpPath = "";
+        }
+        if (cookiesFile == null) {
+            cookiesFile = "";
+        }
+        if (proxy == null) {
+            proxy = "";
         }
     }
 

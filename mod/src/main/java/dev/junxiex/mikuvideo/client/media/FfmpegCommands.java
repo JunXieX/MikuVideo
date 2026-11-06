@@ -18,7 +18,7 @@ import java.util.Map;
 final class FfmpegCommands {
 
     /** 允许的协议白名单：本地文件、HTTP(S)、TLS 与内联数据。 */
-    static final String PROTOCOL_WHITELIST = "file,http,https,tcp,tls,crypto,data";
+    static final String PROTOCOL_WHITELIST = "file,http,https,tcp,tls,crypto,data,httpproxy";
 
     /** 读写超时（微秒），15 秒。 */
     static final long RW_TIMEOUT_MICROS = 15_000_000L;
@@ -46,7 +46,7 @@ final class FfmpegCommands {
         List<String> args = new ArrayList<>(32);
         args.add(ffmpeg.toString());
         addGlobal(args);
-        addInputNetwork(args, request);
+        addInputNetwork(args, request.url(), request.headers());
         addSeek(args, startMillis);
         args.add("-i");
         args.add(request.url());
@@ -72,10 +72,10 @@ final class FfmpegCommands {
         List<String> args = new ArrayList<>(32);
         args.add(ffmpeg.toString());
         addGlobal(args);
-        addInputNetwork(args, request);
+        addInputNetwork(args, request.effectiveAudioUrl(), request.audioHeaders());
         addSeek(args, startMillis);
         args.add("-i");
-        args.add(request.url());
+        args.add(request.effectiveAudioUrl());
         args.add("-map");
         args.add("0:a:0?");
         args.add("-vn");
@@ -117,18 +117,18 @@ final class FfmpegCommands {
         args.add(PROTOCOL_WHITELIST);
     }
 
-    private static void addInputNetwork(List<String> args, MediaRequest request) {
+    private static void addInputNetwork(List<String> args, String url, Map<String, String> headers) {
         // -headers 与 -reconnect 都是 http/https 协议选项：给 file 输入加上会直接报 "Option not found"
-        if (isRemote(request.url())) {
-            String headers = headerBlock(request.headers());
-            if (!headers.isEmpty()) {
+        if (isRemote(url)) {
+            String headerBlock = headerBlock(headers);
+            if (!headerBlock.isEmpty()) {
                 args.add("-headers");
-                args.add(headers);
+                args.add(headerBlock);
             }
         }
         args.add("-rw_timeout");
         args.add(Long.toString(RW_TIMEOUT_MICROS));
-        if (isRemote(request.url())) {
+        if (isRemote(url)) {
             for (String arg : RECONNECT_ARGS) {
                 args.add(arg);
             }

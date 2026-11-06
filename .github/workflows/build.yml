@@ -27,7 +27,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: mod/build/ffmpeg-cache
-          key: ffmpeg-bundles-${{ runner.os }}-n9.0-v1
+          key: ffmpeg-bundles-${{ runner.os }}-n9.0-v2
           restore-keys: |
             ffmpeg-bundles-${{ runner.os }}-
 

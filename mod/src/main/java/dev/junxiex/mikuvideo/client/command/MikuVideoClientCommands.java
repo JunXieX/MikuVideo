@@ -99,6 +99,55 @@ public final class MikuVideoClientCommands {
                         }));
                         return 1;
                     }))
+                    .then(ClientCommands.literal("cookies")
+                            .then(ClientCommands.argument("path", StringArgumentType.greedyString())
+                                    .executes(ctx -> {
+                                        String path = StringArgumentType.getString(ctx, "path").trim();
+                                        ClientConfig config = MikuVideoClient.config();
+                                        config.cookiesFile = path;
+                                        config.save();
+                                        info(ctx.getSource(), "B 站/网页视频 Cookie 文件已设为: " + path);
+                                        if (!Path.of(path).toFile().isFile()) {
+                                            error(ctx.getSource(), "该文件不存在；请导出 Netscape 格式 cookies.txt");
+                                        }
+                                        return 1;
+                                    })))
+                    .then(ClientCommands.literal("quality")
+                            .then(ClientCommands.argument("value", StringArgumentType.word())
+                                    .executes(ctx -> {
+                                        String value = StringArgumentType.getString(ctx, "value").trim().toLowerCase();
+                                        int height = switch (value) {
+                                            case "best", "max" -> 2160;
+                                            case "1080", "720", "480", "360" -> Integer.parseInt(value);
+                                            default -> -1;
+                                        };
+                                        if (height < 0) {
+                                            error(ctx.getSource(), "用法: /mikuvideo-client quality <360|480|720|1080|best>");
+                                            return 0;
+                                        }
+                                        ClientConfig config = MikuVideoClient.config();
+                                        config.qualityHeight = height;
+                                        config.save();
+                                        info(ctx.getSource(), "网页视频解析高度上限已设为 " + height + "p");
+                                        return 1;
+                                    })))
+                    .then(ClientCommands.literal("ytdlp")
+                            .then(ClientCommands.argument("path", StringArgumentType.greedyString())
+                                    .executes(ctx -> {
+                                        String path = StringArgumentType.getString(ctx, "path").trim();
+                                        ClientConfig config = MikuVideoClient.config();
+                                        config.ytDlpPath = path;
+                                        config.save();
+                                        MikuVideoClient.media().resolver().setYtDlpPath(path);
+                                        info(ctx.getSource(), "yt-dlp 路径已设为: " + path);
+                                        return 1;
+                                    })))
+                    .then(ClientCommands.literal("resolver").executes(ctx -> {
+                        FabricClientCommandSource source = ctx.getSource();
+                        java.util.concurrent.CompletableFuture.supplyAsync(() -> MikuVideoClient.media().resolver().statusText())
+                                .thenAccept(text -> source.getClient().execute(() -> info(source, "网页解析器: " + text)));
+                        return 1;
+                    }))
                     .then(ClientCommands.literal("reload").executes(ctx -> {
                         MikuVideoClient.reloadConfig();
                         FabricClientCommandSource source = ctx.getSource();
@@ -112,8 +161,13 @@ public final class MikuVideoClientCommands {
 
     /** 状态文本涉及磁盘/PATH 探测，放到后台算完再回主线程打印。 */
     private static void statusAsync(FabricClientCommandSource source) {
-        java.util.concurrent.CompletableFuture.supplyAsync(() -> MikuVideoClient.media().engine().statusText())
-                .thenAccept(text -> source.getClient().execute(() -> info(source, "解码引擎: " + text)));
+        java.util.concurrent.CompletableFuture.supplyAsync(() -> MikuVideoClient.media().engine().statusText()
+                        + "\n" + MikuVideoClient.media().resolver().statusText())
+                .thenAccept(text -> source.getClient().execute(() -> {
+                    for (String line : text.split("\n")) {
+                        info(source, line);
+                    }
+                }));
     }
 
     private static void info(FabricClientCommandSource source, String text) {

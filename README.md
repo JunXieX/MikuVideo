@@ -9,7 +9,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ## 功能特性
 
 - 每位玩家创建并管理自己的屏幕：位置、尺寸、朝向、音量、公开/私有。
-- 播放控制：播放、暂停、继续、停止、跳转、音量；支持直链 MP4、HLS（m3u8）、FLV 等 FFmpeg 可解码的网络地址。
+- 网页视频：直接粘贴 B 站（视频/番剧/直播）、YouTube、Twitch、Vimeo 等站点链接，客户端用内置 yt-dlp 解析成音视频流；服务端只转发 URL，不解析、不代理。
+- 播放控制：播放、暂停、继续、停止、跳转、音量；同时支持直链 MP4、HLS（m3u8）、FLV 等 FFmpeg 可解码地址。
 - 服务端权威时间线：所有观众按同一时间点播放，播放中每 5 秒自动纠偏，晚进服也能追上进度。
 - 客户端本地解码：基于 FFmpeg 子进程，不占用服务端资源。
 - 客户端解码预算：同时解码的屏幕数量可配，按距离与可见性调度，看不见的屏幕自动停止解码。
@@ -32,7 +33,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.1.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.2.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -42,8 +43,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.1.jar` 放进 `mods/`。
-3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
+2. 把 `MikuVideo-Client-1.0.2.jar` 放进 `mods/`。
+3. **FFmpeg 与 yt-dlp 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/` 与 `.minecraft/mikuvideo/ytdlp/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
 4. 进服后默认按 `V` 与看向的屏幕交互；按键可在“按键设置 → MikuVideo”里修改。
@@ -119,6 +120,10 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mikuvideo-client streams <0-16>` | 同时解码的屏幕数量上限 |
 | `/mikuvideo-client ffmpeg <路径>` | 指定 FFmpeg 可执行文件 |
 | `/mikuvideo-client download` | 自动下载 FFmpeg |
+| `/mikuvideo-client cookies <文件>` | 设置 B 站等站点的 Netscape cookies.txt |
+| `/mikuvideo-client quality <360\|480\|720\|1080\|best>` | 网页视频解析高度上限 |
+| `/mikuvideo-client ytdlp <路径>` | 指定 yt-dlp 可执行文件 |
+| `/mikuvideo-client resolver` | 查看 yt-dlp 状态 |
 | `/mikuvideo-client reload` | 重载客户端配置 |
 
 ## 权限节点
@@ -134,10 +139,30 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ## 视频源说明
 
+### 网页视频（B 站等）
+
+直接粘贴页面链接即可，例如：
+
+```text
+/mv play 客厅 https://www.bilibili.com/video/BV1GJ411x7h7
+/mv play 客厅 https://www.bilibili.com/bangumi/play/ep123456
+/mv play 客厅 https://live.bilibili.com/12345
+```
+
+- 解析在**客户端**完成：内置 yt-dlp 把页面解析成 DASH 的音/视频地址，再由 FFmpeg 解码；服务端只收到原始 URL，不访问站点。
+- B 站 1080p 及以上、付费/大会员内容需要登录 Cookie：用浏览器扩展导出 Netscape 格式的 `cookies.txt`，然后执行 `/mikuvideo-client cookies <文件路径>`。
+- 画质上限：`/mikuvideo-client quality <360|480|720|1080|best>`；默认 1080，实际可用档位由源站与 Cookie 权限决定。
+- 支持列表以 yt-dlp 为准：B 站视频/番剧/直播、YouTube、Twitch、Vimeo、抖音、快手、AcFun 等；YouTube 等站点可能受地区、登录或 JS 运行时限制。
+- 换解析器：`/mikuvideo-client ytdlp <路径>`；查看状态：`/mikuvideo-client resolver`。
+
+### 直链视频
+
 - 支持 FFmpeg 能直接打开的地址：`http(s)://...mp4`、`.m3u8`、`.flv`、`.ts` 等。
 - 防盗链源可在播放时追加 Referer：`/mv play 客厅 https://cdn.example.com/a.m3u8 https://example.com/`。
-- 站点页面（如视频网站播放页）不是直链，需要先用外部工具解析为直链再填入；插件不在服务端做页面解析，避免把服务器变成抓取代理。
-- 默认拒绝 `localhost`、`127.0.0.0/8`、`10/8`、`172.16/12`、`192.168/16`、`169.254/16`、`::1`、`fc00::/7`、`fe80::/10`、`.local`，防止把观众客户端当成内网跳板。
+
+### 安全
+
+- 默认拒绝 `localhost`、`127.0.0.0/8`、`10/8`、`172.16/12`、`192.168/16`、`169.254/16`、`::1`、`fc00::/7`、`fe80::/10`、`.local`，服务端与客户端各校验一次，防止把观众客户端当成内网跳板。
 
 ## 常见问题
 

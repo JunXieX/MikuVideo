@@ -2,6 +2,7 @@ package dev.junxiex.mikuvideo.client.screen;
 
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
 import dev.junxiex.mikuvideo.client.media.MediaState;
+import dev.junxiex.mikuvideo.client.media.resolve.ResolvedMedia;
 import dev.junxiex.mikuvideo.client.net.ClockSync;
 import dev.junxiex.mikuvideo.client.render.VideoTexture;
 import dev.junxiex.mikuvideo.protocol.Playback;
@@ -38,6 +39,9 @@ public final class ClientScreen {
     private String endedUrl = "";
     private long endedPosition;
 
+    private ResolvedMedia resolved;
+    private String resolvedUrl = "";
+
     /** 由解码预算计算出的相机距离平方，仅由客户端线程写入。 */
     public volatile double distanceSq;
 
@@ -72,6 +76,9 @@ public final class ClientScreen {
             this.reportedDurationUrl = "";
             this.reportedErrorKey = "";
             this.failureCount = 0;
+        }
+        if (urlChanged) {
+            clearResolved();
         }
         if (urlChanged || jumped || next.isStopped()) {
             clearEnded();
@@ -256,6 +263,20 @@ public final class ClientScreen {
     public void clearEnded() {
         this.endedUrl = "";
         this.endedPosition = 0L;
+    }
+
+    public void setResolved(String url, ResolvedMedia media) {
+        this.resolved = media;
+        this.resolvedUrl = url == null ? "" : url;
+    }
+
+    public ResolvedMedia resolved(String url) {
+        return url != null && url.equals(resolvedUrl) ? resolved : null;
+    }
+
+    public void clearResolved() {
+        this.resolved = null;
+        this.resolvedUrl = "";
     }
 
     public long expectedPositionMillis(long serverNow) {

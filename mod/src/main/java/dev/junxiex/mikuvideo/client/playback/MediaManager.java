@@ -5,6 +5,8 @@ import dev.junxiex.mikuvideo.client.media.MediaEngine;
 import dev.junxiex.mikuvideo.client.media.MediaRequest;
 import dev.junxiex.mikuvideo.client.media.MediaSession;
 import dev.junxiex.mikuvideo.client.media.MediaState;
+import dev.junxiex.mikuvideo.client.media.MediaResolverService;
+import dev.junxiex.mikuvideo.client.media.resolve.ResolvedMedia;
 
 import dev.junxiex.mikuvideo.client.MikuVideoClient;
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
@@ -38,16 +40,23 @@ public final class MediaManager {
     private static final long AHEAD_TOLERANCE_MS = 3_500L;
 
     private final MediaEngine engine;
+    private final MediaResolverService resolverService;
     private final Map<String, Entry> entries = new ConcurrentHashMap<>();
+    private final Set<String> resolving = ConcurrentHashMap.newKeySet();
     private int tickCounter;
 
     private MediaManager() {
         Path gameDirectory = FabricLoader.getInstance().getGameDir();
         this.engine = new FfmpegMediaEngine(gameDirectory);
+        this.resolverService = new MediaResolverService(gameDirectory);
     }
 
     public MediaEngine engine() {
         return engine;
+    }
+
+    public MediaResolverService resolver() {
+        return resolverService;
     }
 
     public void tick(Minecraft minecraft) {
@@ -117,6 +126,16 @@ public final class MediaManager {
             }
             return;
         }
+        if (screen.failureCount() >= 3) {
+            return;
+        }
+        String url = playback.url();
+        if (resolverService.looksLikePage(url) && screen.resolved(url) == null) {
+            if (screen.lastFailureAt() + 5_000L <= System.currentTimeMillis()) {
+                resolve(screen, config, url);
+            }
+            return;
+        }
         long serverNow = ClockSync.serverNow();
         long expected = playback.positionAt(serverNow);
         if (playback.durationMillis() > 0L) {
@@ -124,7 +143,12 @@ public final class MediaManager {
         }
         int width = decodeWidth(info, config);
         int height = decodeHeight(info, config, width);
-        String key = playback.url() + "|" + playback.headers().hashCode() + "|" + width + "x" + height + "|" + config.fps + "|" + config.audioEnabled;
+        ResolvedMedia resolved = screen.resolved(url);
+        MediaRequest request = resolved == null
+                ? new MediaRequest(url, playback.headers(), Math.max(0L, expected), width, height, config.fps, config.audioEnabled)
+                : resolved.toRequest(Math.max(0L, expected), width, height, config.fps, config.audioEnabled, playback.headers());
+        String key = request.url() + "|" + request.audioUrl() + "|" + request.headers().hashCode()
+                + "|" + width + "x" + height + "|" + config.fps + "|" + config.audioEnabled;
         Entry entry = entries.get(info.id());
         if (entry == null && screen.failureCount() >= 3) {
             return;
@@ -137,12 +161,14 @@ public final class MediaManager {
             MediaSession session = engine.createSession();
             entry = new Entry(session, key);
             entries.put(info.id(), entry);
-            long start = Math.max(0L, expected);
-            session.start(new MediaRequest(playback.url(), playback.headers(), start, width, height, config.fps, config.audioEnabled),
-                    screen::offerFrame,
-                    (state, detail) -> screen.setMediaState(state, detail));
+            session.start(request, screen::offerFrame, (state, detail) -> screen.setMediaState(state, detail));
             if (playback.paused()) {
                 session.pause();
+            }
+            if (resolved != null && resolved.durationMillis() > 0L && playback.durationMillis() <= 0L
+                    && screen.shouldReportDuration(url)) {
+                screen.markDurationReported(url);
+                ClientNetworking.send(new Message.DurationC2S(info.id(), resolved.durationMillis()));
             }
         }
         MediaSession session = entry.session;
@@ -185,6 +211,38 @@ public final class MediaManager {
         }
     }
 
+    private void resolve(ClientScreen screen, ClientConfig config, String url) {
+        String id = screen.info().id();
+        if (!resolving.add(id)) {
+            return;
+        }
+        screen.setMediaState(MediaState.PREPARING, "正在解析视频地址…");
+        Path cookies = null;
+        if (config.cookiesFile != null && !config.cookiesFile.isBlank()) {
+            try {
+                cookies = Path.of(config.cookiesFile);
+            } catch (RuntimeException ignored) {
+                cookies = null;
+            }
+        }
+        resolverService.resolve(url, cookies, config.qualityHeight, config.proxy)
+                .whenComplete((media, error) -> Minecraft.getInstance().execute(() -> {
+                    resolving.remove(id);
+                    if (error != null) {
+                        String message = error.getCause() != null && error.getCause().getMessage() != null
+                                ? error.getCause().getMessage() : String.valueOf(error.getMessage());
+                        screen.setMediaState(MediaState.ERROR, "解析失败：" + message);
+                        if (screen.shouldReportError(url)) {
+                            screen.markErrorReported(url);
+                            ClientNetworking.send(new Message.MediaErrorC2S(id, 7, "解析失败：" + message));
+                        }
+                    } else {
+                        screen.setResolved(url, media);
+                        screen.resetFailures();
+                    }
+                }));
+    }
+
     private static int decodeWidth(ScreenInfo info, ClientConfig config) {
         int width = Math.round(info.width() * config.pixelsPerBlock);
         width = Math.max(128, Math.min(config.maxWidth, width));
@@ -199,6 +257,7 @@ public final class MediaManager {
     }
 
     public void close(String screenId) {
+        resolving.remove(screenId);
         Entry entry = entries.remove(screenId);
         if (entry != null) {
             entry.session.close();
@@ -206,6 +265,7 @@ public final class MediaManager {
     }
 
     public void closeAll() {
+        resolving.clear();
         for (String id : List.copyOf(entries.keySet())) {
             close(id);
         }
