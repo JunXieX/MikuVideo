@@ -32,10 +32,8 @@ public final class PlaybackCommands {
     public void attach(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("play")
                 .then(screenArguments.screenArgument("screen")
-                        .then(Commands.argument("url", StringArgumentType.word())
-                                .executes(context -> play(context, null))
-                                .then(Commands.argument("referer", StringArgumentType.word())
-                                        .executes(context -> play(context, StringArgumentType.getString(context, "referer")))))));
+                        .then(Commands.argument("url", StringArgumentType.greedyString())
+                                .executes(this::play))));
 
         root.then(Commands.literal("pause")
                 .then(screenArguments.screenArgument("screen")
@@ -57,7 +55,7 @@ public final class PlaybackCommands {
                                         DoubleArgumentType.getDouble(context, "seconds"))))));
     }
 
-    private int play(CommandContext<CommandSourceStack> context, String referer) {
+    private int play(CommandContext<CommandSourceStack> context) {
         CommandSourceStack source = context.getSource();
         if (!support.allow(source)) {
             return 0;
@@ -66,7 +64,11 @@ public final class PlaybackCommands {
         if (screen == null || !support.requireManage(source, screen)) {
             return 0;
         }
-        String rawUrl = StringArgumentType.getString(context, "url");
+        // greedyString 会吞掉整行：第一个空白前是 URL，后面是可选 Referer。
+        String raw = StringArgumentType.getString(context, "url").trim();
+        String[] parts = raw.split("\\s+", 2);
+        String rawUrl = parts.length == 0 ? "" : parts[0];
+        String referer = parts.length > 1 ? parts[1].trim() : null;
         Urls.Checked checked = Urls.validate(rawUrl, referer, support.settings().media());
         if (!checked.ok()) {
             support.error(source, checked.message());
