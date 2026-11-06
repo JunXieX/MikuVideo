@@ -21,6 +21,7 @@ public final class MediaResolverService {
 
     private final YtDlpLocator locator;
     private final YtDlpResolver resolver;
+    private final BilibiliResolver bilibili = new BilibiliResolver();
     private final ExecutorService executor;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
@@ -87,11 +88,24 @@ public final class MediaResolverService {
             return CompletableFuture.completedFuture(cached.media);
         }
         return CompletableFuture.supplyAsync(() -> {
+            Exception nativeFailure = null;
+            if (bilibili.supports(url)) {
+                try {
+                    ResolvedMedia media = bilibili.resolve(url, cookies, maxHeight, proxy);
+                    cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
+                    return media;
+                } catch (Exception error) {
+                    nativeFailure = error;
+                }
+            }
             try {
                 ResolvedMedia media = resolver.resolve(url, cookies, maxHeight, proxy);
                 cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
                 return media;
             } catch (Exception error) {
+                if (nativeFailure != null) {
+                    error.addSuppressed(nativeFailure);
+                }
                 if (!isKnownPage(url)) {
                     // 未知站点解析失败时仍按直链尝试，避免误伤普通流地址。
                     return direct(url);
