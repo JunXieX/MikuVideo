@@ -25,14 +25,14 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | 服务端 | Paper 或 Folia 26.3，Java 25 |
 | 客户端 | Minecraft 26.3，Fabric Loader 0.20.1 或更新，Fabric API |
 | 客户端 Java | Java 25 |
-| 客户端解码器 | FFmpeg 6/7/9（放在 PATH、游戏目录或手动指定，也可用命令自动下载） |
+| 客户端解码器 | Windows x64 / Linux x64 已内置 FFmpeg，无需安装；macOS 与其他架构需自行安装或用命令指定 |
 | 网络 | 客户端能直接访问视频源（服务端不需要） |
 
 ## 安装
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.0.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.1.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -41,13 +41,11 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 客户端
 
-1. 安装 Fabric Loader 0.20.1+ 与 Fabric API。
-2. 把 `MikuVideo-Client-1.0.0.jar` 放进 `mods/`。
-3. 安装 FFmpeg（任选一种）：
-   - 已安装到系统 PATH；
-   - 放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`（Linux/macOS 为 `ffmpeg`）；
-   - 进服后执行 `/mikuvideo-client ffmpeg <可执行文件路径>`；
-   - 进服后执行 `/mikuvideo-client download` 自动下载（Windows/Linux 支持，macOS 请手动安装）。
+1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
+2. 把 `MikuVideo-Client-1.0.1.jar` 放进 `mods/`。
+3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
+   - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
+   - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
 4. 进服后默认按 `V` 与看向的屏幕交互；按键可在“按键设置 → MikuVideo”里修改。
 
 > 客户端模组是观看与控制的必要条件。没有安装模组的玩家仍可正常进服，但看不到屏幕，服务端会提示安装。
@@ -158,8 +156,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 **HLS 直播/点播跳转不准？**
 HLS 的跳转只能落在分片边界（常见 2~6 秒一片），这是协议本身的限制；MP4 直链的跳转是精确的。需要精确跳转时优先使用 MP4 源。
 
-**FFmpeg 版本有要求吗？**
-6.0 及以上即可，推荐 7.x / 9.x。Windows 可用 `/mikuvideo-client download` 自动获取，Linux 可用系统包管理器安装。
+**还需要自己装 FFmpeg 吗？**
+Windows x64 / Linux x64 不需要，模组已内置 FFmpeg 9.0，首次播放自动解压。macOS、Linux ARM 等未内置平台仍可用系统 FFmpeg 或 `/mikuvideo-client ffmpeg <路径>` 指定。
 
 **升级会丢数据吗？**
 不会。替换 jar 重启即可，`config.yml` 与 `screens.json` 保持原样；格式版本变化时会按兼容方式读取。

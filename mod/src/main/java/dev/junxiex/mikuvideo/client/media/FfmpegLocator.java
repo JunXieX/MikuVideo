@@ -191,6 +191,12 @@ public final class FfmpegLocator {
             }
         }
 
+        // 内置 FFmpeg：优先级仅次于显式路径，玩家无需自行安装。
+        Path bundled = BundledFfmpeg.ensure(bundleDir());
+        if (bundled != null) {
+            list.add(bundled);
+        }
+
         // 系统 PATH：先让系统查一次完整路径，失败再交给 ProcessBuilder 直接解析命令名。
         for (String where : whereOutput()) {
             list.add(Path.of(where));
