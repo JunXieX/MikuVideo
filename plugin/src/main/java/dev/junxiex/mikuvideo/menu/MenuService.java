@@ -1,6 +1,7 @@
 package dev.junxiex.mikuvideo.menu;
 
 import dev.junxiex.mikuvideo.config.Settings;
+import dev.junxiex.mikuvideo.limit.LimitService;
 import dev.junxiex.mikuvideo.net.ClientRegistry;
 import dev.junxiex.mikuvideo.permission.Permissions;
 import dev.junxiex.mikuvideo.playback.PlaybackService;
@@ -54,14 +55,16 @@ public final class MenuService {
     private final ScreenManager screens;
     private final PlaybackService playback;
     private final ClientRegistry clients;
+    private final LimitService limits;
     private final Supplier<Settings> settings;
     private final Tasks tasks;
 
     public MenuService(ScreenManager screens, PlaybackService playback, ClientRegistry clients,
-                       Supplier<Settings> settings, Tasks tasks) {
+                       LimitService limits, Supplier<Settings> settings, Tasks tasks) {
         this.screens = screens;
         this.playback = playback;
         this.clients = clients;
+        this.limits = limits;
         this.settings = settings == null ? Settings::defaults : settings;
         this.tasks = tasks;
     }
@@ -169,7 +172,8 @@ public final class MenuService {
                         + "　进度：" + Text.duration(position) + " / "
                         + (state.durationMillis() > 0L ? Text.duration(state.durationMillis()) : "未知"))),
                 DialogBody.plainMessage(Component.text("尺寸：" + screen.width() + " x " + screen.height()
-                        + "　音量：" + screen.volume() + "　可见性：" + (screen.publicScreen() ? "公开" : "私有"))),
+                        + "　音量：" + screen.volume() + "　可见性：" + (screen.publicScreen() ? "公开" : "私有")
+                        + "　循环：" + (screen.loop() ? "开" : "关"))),
                 DialogBody.plainMessage(Component.text("客户端：" + clients.describe(player.getUniqueId()))));
         List<DialogInput> inputs = List.of(
                 DialogInput.text("url", Component.text("视频链接"))
@@ -209,6 +213,9 @@ public final class MenuService {
         buttons.add(button(Component.text(screen.publicScreen() ? "设为私有" : "设为公开"),
                 Component.text("切换可见性"),
                 click((response, clicker) -> applyAccess(clicker, screenId, !screen.publicScreen()))));
+        buttons.add(button(Component.text(screen.loop() ? "关闭循环" : "开启循环"),
+                Component.text("播到结尾后是否从头开始"),
+                click((response, clicker) -> applyLoop(clicker, screenId, !screen.loop()))));
         buttons.add(button(Component.text("删除"), Component.text("需要二次确认"),
                 click((response, clicker) -> openDeleteConfirm(clicker, screenId))));
         buttons.add(button(Component.text("返回列表"), Component.text("回到屏幕列表"),
@@ -421,9 +428,14 @@ public final class MenuService {
             message(player, "<red>宽高必须是数字");
             return;
         }
-        Settings.Limits limits = settings.get().limits();
-        float clampedWidth = (float) limits.clampWidth(width);
-        float clampedHeight = (float) limits.clampHeight(height);
+        String rejection = limits.validate(player, width, height, -1);
+        if (rejection != null) {
+            message(player, "<red>" + rejection);
+            return;
+        }
+        Settings.Limits global = settings.get().limits();
+        float clampedWidth = (float) global.clampWidth(width);
+        float clampedHeight = (float) global.clampHeight(height);
         screens.replace(screen.withSize(clampedWidth, clampedHeight));
         message(player, "<green>尺寸已更新为 " + clampedWidth + " x " + clampedHeight);
         openControl(player, screenId);
@@ -462,6 +474,17 @@ public final class MenuService {
         }
         screens.replace(screen.withGeometry(hit.get()));
         message(player, "<green>屏幕已移动到当前视线位置");
+        openControl(player, screenId);
+    }
+
+    private void applyLoop(Player player, String screenId, boolean enabled) {
+        Screen screen = screens.get(screenId).orElse(null);
+        if (screen == null) {
+            message(player, settings.get().messages().screenNotFound());
+            return;
+        }
+        screens.replace(screen.withLoop(enabled));
+        message(player, enabled ? "<green>已开启循环播放" : "<yellow>已关闭循环播放");
         openControl(player, screenId);
     }
 

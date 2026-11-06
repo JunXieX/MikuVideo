@@ -31,6 +31,7 @@ public final class MediaResolverService {
     private final DouyinResolver douyin = new DouyinResolver();
     private final ExecutorService executor;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
+    private volatile String serverCookie = "";
 
     public MediaResolverService(Path gameDir) {
         this.executor = Executors.newFixedThreadPool(2, runnable -> {
@@ -38,6 +39,16 @@ public final class MediaResolverService {
             thread.setDaemon(true);
             return thread;
         });
+    }
+
+    /** 服务端下发的 B 站凭证；空表示不使用。 */
+    public void setServerCookie(String cookie) {
+        this.serverCookie = cookie == null ? "" : cookie.trim();
+        cache.clear();
+    }
+
+    public boolean hasServerCookie() {
+        return !serverCookie.isBlank();
     }
 
     /** 空值使用内置默认接口，{@code off} 表示关闭抖音视频解析。 */
@@ -92,7 +103,7 @@ public final class MediaResolverService {
     public CompletableFuture<java.util.List<BilibiliSearchItem>> searchBilibili(String keyword, Path cookies, String proxy) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                return bilibili.search(keyword, 1, cookies, proxy);
+                return bilibili.search(keyword, 1, cookies, serverCookie, proxy);
             } catch (Exception error) {
                 throw new CompletionException(error);
             }
@@ -104,7 +115,7 @@ public final class MediaResolverService {
             return CompletableFuture.completedFuture(direct(url));
         }
         String key = url + "|" + maxHeight + "|" + (cookies == null ? "" : cookies.toAbsolutePath()) + "|" + proxy
-                + "|" + douyin.apiTemplate();
+                + "|" + douyin.apiTemplate() + "|" + serverCookie.hashCode();
         Cached cached = cache.get(key);
         long now = System.currentTimeMillis();
         if (cached != null && cached.expiresAt > now) {
@@ -123,7 +134,7 @@ public final class MediaResolverService {
             }
             if (bilibili.supports(url)) {
                 try {
-                    ResolvedMedia media = bilibili.resolve(url, cookies, maxHeight, proxy);
+                    ResolvedMedia media = bilibili.resolve(url, cookies, serverCookie, maxHeight, proxy);
                     cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
                     return media;
                 } catch (Exception error) {

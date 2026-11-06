@@ -4,6 +4,7 @@ import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import dev.junxiex.mikuvideo.client.MikuVideoClient;
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
+import dev.junxiex.mikuvideo.client.credential.CredentialService;
 import dev.junxiex.mikuvideo.client.media.FfmpegMediaEngine;
 import dev.junxiex.mikuvideo.client.media.MediaEngine;
 import dev.junxiex.mikuvideo.client.screen.ScreenRegistry;
@@ -196,6 +197,29 @@ public final class MikuVideoClientCommands {
                                 .thenAccept(text -> source.getClient().execute(() -> info(source, "网页解析器: " + text)));
                         return 1;
                     }))
+                    .then(ClientCommands.literal("credential")
+                            .executes(ctx -> credentialStatus(ctx.getSource()))
+                            .then(ClientCommands.literal("status")
+                                    .executes(ctx -> credentialStatus(ctx.getSource())))
+                            .then(ClientCommands.literal("refresh").executes(ctx -> {
+                                CredentialService service = MikuVideoClient.credentials();
+                                if (service == null) {
+                                    error(ctx.getSource(), "凭证服务尚未初始化");
+                                    return 0;
+                                }
+                                service.requestRefresh();
+                                return 1;
+                            }))
+                            .then(ClientCommands.literal("clear").executes(ctx -> {
+                                CredentialService service = MikuVideoClient.credentials();
+                                if (service == null) {
+                                    error(ctx.getSource(), "凭证服务尚未初始化");
+                                    return 0;
+                                }
+                                service.clear();
+                                info(ctx.getSource(), "已清除本服保存的 B 站凭证");
+                                return 1;
+                            })))
                     .then(ClientCommands.literal("reload").executes(ctx -> {
                         MikuVideoClient.reloadConfig();
                         FabricClientCommandSource source = ctx.getSource();
@@ -205,6 +229,16 @@ public final class MikuVideoClientCommands {
                     }));
             dispatcher.register(root);
         });
+    }
+
+    private static int credentialStatus(FabricClientCommandSource source) {
+        CredentialService service = MikuVideoClient.credentials();
+        if (service == null) {
+            error(source, "凭证服务尚未初始化");
+            return 0;
+        }
+        info(source, service.statusText());
+        return 1;
     }
 
     /** 状态文本涉及磁盘/PATH 探测，放到后台算完再回主线程打印。 */

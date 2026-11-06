@@ -47,6 +47,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
     private final ClientRegistry clients;
     private final Supplier<Settings> settings;
     private final Tasks tasks;
+    private final String serverId;
     private final Map<UUID, Set<String>> visible = new ConcurrentHashMap<>();
     private final Map<String, Set<UUID>> viewers = new ConcurrentHashMap<>();
     private final Map<UUID, String> worlds = new ConcurrentHashMap<>();
@@ -56,13 +57,14 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
     private final AtomicLong sendFailures = new AtomicLong();
 
     public SyncService(Plugin plugin, ScreenManager screens, PlaybackService playback, ClientRegistry clients,
-                       Supplier<Settings> settings, Tasks tasks) {
+                       String serverId, Supplier<Settings> settings, Tasks tasks) {
         this.plugin = plugin;
         this.screens = screens;
         this.playback = playback;
         this.clients = clients;
         this.settings = settings == null ? Settings::defaults : settings;
         this.tasks = tasks;
+        this.serverId = serverId == null ? "" : serverId;
     }
 
     // ---------------------------------------------------------------- 握手与全量同步
@@ -75,7 +77,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         Settings current = settings.get();
         String serverName = plugin.getPluginMeta().getName() + " " + plugin.getPluginMeta().getVersion();
         send(player, new Message.HelloS2C(Protocol.VERSION, System.currentTimeMillis(), 0,
-                Text.trimBytes(serverName, 128), current.messages().clientDownloadUrl()));
+                Text.trimBytes(serverName, 128), current.messages().clientDownloadUrl(), serverId));
     }
 
     /** 全量同步：Clear 之外的一次完整下发（世界内可见屏幕 + 每屏播放状态）。 */
@@ -328,6 +330,11 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         worlds.clear();
         pingSentAt.clear();
         rttMillis.clear();
+    }
+
+    /** 下发凭证；单独暴露，便于下发层做频率限制与审计。 */
+    public void sendCredential(Player player, Message.CredentialS2C credential) {
+        send(player, credential);
     }
 
     /** 发送一条提示，用于命令、交互与媒体错误通知。 */

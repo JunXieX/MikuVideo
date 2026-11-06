@@ -270,12 +270,37 @@ public final class PlaybackService implements ScreenManager.Listener {
                 if (queueNext(target)) {
                     continue;
                 }
+                if (target.loop()) {
+                    restart(target, state, now);
+                    continue;
+                }
+                finish(target, state, now);
+                continue;
             }
             if (!broadcaster.hasNearbyViewer(target)) {
                 continue;
             }
             broadcaster.playbackChanged(target, state);
         }
+    }
+
+    /** 循环播放：回到起点并以当前时刻重新计时。 */
+    private void restart(Screen screen, Playback state, long now) {
+        Playback restarted = new Playback(state.url(), state.headers(), 0L, now,
+                false, state.rate(), state.volume(), state.audioEnabled(), state.durationMillis());
+        states.put(screen.id(), restarted);
+        bump(screen.id());
+        broadcaster.playbackChanged(screen, restarted);
+    }
+
+    /** 非循环播放到结尾：停在片尾，避免客户端反复触发结束逻辑。 */
+    private void finish(Screen screen, Playback state, long now) {
+        long duration = Math.max(0L, state.durationMillis());
+        Playback ended = new Playback(state.url(), state.headers(), duration, now,
+                true, state.rate(), state.volume(), false, duration);
+        states.put(screen.id(), ended);
+        bump(screen.id());
+        broadcaster.playbackChanged(screen, ended);
     }
 
     /** 队列项。 */

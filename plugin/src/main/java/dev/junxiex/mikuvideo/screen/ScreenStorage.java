@@ -256,6 +256,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
         object.addProperty("height", screen.height());
         object.addProperty("volume", screen.volume());
         object.addProperty("public", screen.publicScreen());
+        object.addProperty("loop", screen.loop());
         object.addProperty("createdAt", screen.createdAt());
         object.add("playback", writePlayback(state));
         object.add("queue", writeQueue(playback.queueList(screen.id())));
@@ -361,6 +362,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
                 (float) optDouble(object, "height", 2.25D),
                 optInt(object, "volume", 80),
                 optBoolean(object, "public", true),
+                optBoolean(object, "loop", false),
                 optLong(object, "createdAt", System.currentTimeMillis()));
         Playback state = readPlayback(object.getAsJsonObject("playback"), screen.volume());
         return new Loaded(screen, state, readQueue(object.get("queue")));

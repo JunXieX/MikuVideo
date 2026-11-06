@@ -14,7 +14,7 @@ public final class Protocol {
     public static final String CHANNEL = "mikuvideo:main";
 
     /** 协议版本，任何字段变更都要递增。 */
-    public static final int VERSION = 1;
+    public static final int VERSION = 2;
 
     /** 单条插件消息上限（原版 CustomPayload 上限为 1 MiB，这里留出余量）。 */
     public static final int MAX_MESSAGE_BYTES = 1024 * 1024;
@@ -32,6 +32,8 @@ public final class Protocol {
     public static final int MAX_NOTICE = 1024;
     public static final int MAX_MOD_VERSION = 32;
     public static final int MAX_ERROR_MESSAGE = 512;
+    public static final int MAX_COOKIE = 4096;
+    public static final int MAX_SERVER_ID = 64;
 
     /** 屏幕上限，防止恶意客户端把列表撑爆。 */
     public static final int MAX_SCREEN_COUNT = 512;
@@ -45,6 +47,7 @@ public final class Protocol {
     public static final int S2C_NOTICE = 6;
     public static final int S2C_CLEAR = 7;
     public static final int S2C_PING = 8;
+    public static final int S2C_CREDENTIAL = 9;
 
     // 客户端 -> 服务端
     public static final int C2S_HELLO = 101;
@@ -53,6 +56,7 @@ public final class Protocol {
     public static final int C2S_PONG = 104;
     public static final int C2S_DURATION = 105;
     public static final int C2S_REQUEST_SYNC = 106;
+    public static final int C2S_CREDENTIAL_REQUEST = 107;
 
     // C2S_INTERACT 的动作
     public static final int INTERACT_OPEN_MENU = 0;

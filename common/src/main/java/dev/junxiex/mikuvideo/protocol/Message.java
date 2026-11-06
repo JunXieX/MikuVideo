@@ -6,8 +6,8 @@ import java.util.List;
 public sealed interface Message {
     int op();
 
-    record HelloS2C(int protocolVersion, long serverEpochMillis, int flags, String serverName, String downloadUrl)
-            implements Message {
+    record HelloS2C(int protocolVersion, long serverEpochMillis, int flags, String serverName,
+                     String downloadUrl, String serverId) implements Message {
         @Override
         public int op() {
             return Protocol.S2C_HELLO;
@@ -67,6 +67,19 @@ public sealed interface Message {
         }
     }
 
+    /**
+     * 服务端下发 B 站凭证。
+     *
+     * <p>只发给有权限且通过风控校验的玩家；{@code serverId} 用于客户端把凭证
+     * 绑定到当前服务器，{@code expiresAt} 到达后客户端必须丢弃并重新申请。</p>
+     */
+    record CredentialS2C(String serverId, String cookie, long issuedAt, long expiresAt) implements Message {
+        @Override
+        public int op() {
+            return Protocol.S2C_CREDENTIAL;
+        }
+    }
+
     record HelloC2S(int protocolVersion, String modVersion, long clientEpochMillis) implements Message {
         @Override
         public int op() {
@@ -106,6 +119,13 @@ public sealed interface Message {
         @Override
         public int op() {
             return Protocol.C2S_REQUEST_SYNC;
+        }
+    }
+
+    record CredentialRequestC2S() implements Message {
+        @Override
+        public int op() {
+            return Protocol.C2S_CREDENTIAL_REQUEST;
         }
     }
 }

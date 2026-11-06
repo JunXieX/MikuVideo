@@ -2,6 +2,7 @@ package dev.junxiex.mikuvideo.command;
 
 import dev.junxiex.mikuvideo.MikuVideoPlugin;
 import dev.junxiex.mikuvideo.config.Settings;
+import dev.junxiex.mikuvideo.limit.LimitService;
 import dev.junxiex.mikuvideo.menu.MenuService;
 import dev.junxiex.mikuvideo.net.ClientRegistry;
 import dev.junxiex.mikuvideo.net.SyncService;
@@ -37,17 +38,20 @@ public final class CommandSupport {
     private final SyncService sync;
     private final ClientRegistry clients;
     private final MenuService menu;
+    private final LimitService limits;
     private final Tasks tasks;
     private final Map<UUID, Long> cooldowns = new ConcurrentHashMap<>();
 
     public CommandSupport(MikuVideoPlugin plugin, ScreenManager screens, PlaybackService playback,
-                          SyncService sync, ClientRegistry clients, MenuService menu, Tasks tasks) {
+                          SyncService sync, ClientRegistry clients, MenuService menu,
+                          LimitService limits, Tasks tasks) {
         this.plugin = plugin;
         this.screens = screens;
         this.playback = playback;
         this.sync = sync;
         this.clients = clients;
         this.menu = menu;
+        this.limits = limits;
         this.tasks = tasks;
     }
 
@@ -77,6 +81,10 @@ public final class CommandSupport {
 
     public Tasks tasks() {
         return tasks;
+    }
+
+    public LimitService limits() {
+        return limits;
     }
 
     public Settings settings() {

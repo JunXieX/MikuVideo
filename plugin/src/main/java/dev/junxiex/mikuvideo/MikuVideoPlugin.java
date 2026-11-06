@@ -2,7 +2,10 @@ package dev.junxiex.mikuvideo;
 
 import dev.junxiex.mikuvideo.command.CommandService;
 import dev.junxiex.mikuvideo.command.CommandSupport;
+import dev.junxiex.mikuvideo.config.ServerIdentity;
 import dev.junxiex.mikuvideo.config.Settings;
+import dev.junxiex.mikuvideo.credential.CookieService;
+import dev.junxiex.mikuvideo.limit.LimitService;
 import dev.junxiex.mikuvideo.listener.PlayerListener;
 import dev.junxiex.mikuvideo.menu.MenuService;
 import dev.junxiex.mikuvideo.net.ClientRegistry;
@@ -36,6 +39,9 @@ public final class MikuVideoPlugin extends JavaPlugin {
     private ScreenManager screenManager;
     private PlaybackService playbackService;
     private ScreenStorage storage;
+    private ServerIdentity serverIdentity;
+    private CookieService cookieService;
+    private LimitService limitService;
     private ClientRegistry clientRegistry;
     private SyncService syncService;
     private MenuService menuService;
@@ -114,6 +120,14 @@ public final class MikuVideoPlugin extends JavaPlugin {
         return menuService;
     }
 
+    public CookieService cookieService() {
+        return cookieService;
+    }
+
+    public ServerIdentity serverIdentity() {
+        return serverIdentity;
+    }
+
     /**
      * 重新读取配置并原子替换快照，随后按新参数重启定时任务。
      *
@@ -123,6 +137,7 @@ public final class MikuVideoPlugin extends JavaPlugin {
         try {
             reloadConfig();
             settings = Settings.load(this);
+            Permissions.register(this, tierPermissions());
             startTimers();
             return true;
         } catch (RuntimeException error) {
@@ -135,6 +150,8 @@ public final class MikuVideoPlugin extends JavaPlugin {
         saveDefaultConfig();
         settings = Settings.load(this);
         tasks = new Tasks(this);
+        serverIdentity = new ServerIdentity(this);
+        limitService = new LimitService(this::settings);
         screenManager = new ScreenManager(this::settings);
         playbackService = new PlaybackService(screenManager, this::settings, tasks);
         storage = new ScreenStorage(this, screenManager, playbackService, this::settings, tasks);
@@ -150,19 +167,22 @@ public final class MikuVideoPlugin extends JavaPlugin {
         }
 
         clientRegistry = new ClientRegistry();
-        syncService = new SyncService(this, screenManager, playbackService, clientRegistry, this::settings, tasks);
+        syncService = new SyncService(this, screenManager, playbackService, clientRegistry,
+                serverIdentity.id(), this::settings, tasks);
+        cookieService = new CookieService(this, syncService, tasks, this::settings, serverIdentity.id());
         playbackService.setBroadcaster(syncService);
         screenManager.addListener(syncService);
-        menuService = new MenuService(screenManager, playbackService, clientRegistry, this::settings, tasks);
+        menuService = new MenuService(screenManager, playbackService, clientRegistry, limitService,
+                this::settings, tasks);
 
-        Permissions.register(this);
+        Permissions.register(this, tierPermissions());
         packetListener = new PacketListener(this, clientRegistry, syncService, screenManager,
-                playbackService, menuService, this::settings, tasks);
+                playbackService, menuService, cookieService, this::settings, tasks);
         getServer().getMessenger().registerOutgoingPluginChannel(this, Protocol.CHANNEL);
         getServer().getMessenger().registerIncomingPluginChannel(this, Protocol.CHANNEL, packetListener);
 
         CommandSupport commandSupport = new CommandSupport(this, screenManager, playbackService,
-                syncService, clientRegistry, menuService, tasks);
+                syncService, clientRegistry, menuService, limitService, tasks);
         commandService = new CommandService(this, commandSupport);
         commandService.register();
 
@@ -171,6 +191,16 @@ public final class MikuVideoPlugin extends JavaPlugin {
         startTimers();
         getLogger().info("MikuVideo 已启用：协议版本 " + Protocol.VERSION + "，已载入 " + loaded.size()
                 + " 块屏幕，可用命令 /" + CommandService.ROOT + "（别名 " + String.join(", ", CommandService.ALIASES) + "）");
+    }
+
+    private List<String> tierPermissions() {
+        List<String> names = new java.util.ArrayList<>();
+        for (Settings.Tier tier : settings.limits().effectiveTiers()) {
+            if (!tier.permission().isBlank()) {
+                names.add(tier.permission());
+            }
+        }
+        return names;
     }
 
     private void startTimers() {

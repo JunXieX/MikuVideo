@@ -6,6 +6,7 @@ import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.Plugin;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
@@ -20,7 +21,8 @@ import java.util.Set;
  *
  * @author JunXieX
  */
-public record Settings(Limits limits, SyncSettings sync, Media media, StorageSettings storage, Messages messages) {
+public record Settings(Limits limits, SyncSettings sync, Media media, Bilibili bilibili,
+                       StorageSettings storage, Messages messages) {
 
     private static final List<String> DEFAULT_SCHEMES = List.of("http", "https");
     private static final List<String> DEFAULT_HEADERS =
@@ -30,15 +32,24 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
         limits = limits == null ? Limits.DEFAULTS : limits;
         sync = sync == null ? SyncSettings.DEFAULTS : sync;
         media = media == null ? Media.DEFAULTS : media;
+        bilibili = bilibili == null ? Bilibili.DEFAULTS : bilibili;
         storage = storage == null ? StorageSettings.DEFAULTS : storage;
         messages = messages == null ? Messages.DEFAULTS : messages;
     }
 
-    /** 数量与尺寸限制。 */
+    /** 数量与尺寸限制。tiers 是可选的分级限制，按权限匹配。 */
     public record Limits(int maxScreensPerPlayer, double maxScreenWidth, double maxScreenHeight,
-                         double minScreenWidth, double minScreenHeight, int maxTotalScreens) {
+                         double minScreenWidth, double minScreenHeight, int maxTotalScreens,
+                         List<Tier> tiers) {
 
-        public static final Limits DEFAULTS = new Limits(8, 16.0D, 9.0D, 0.5D, 0.5D, Protocol.MAX_SCREEN_COUNT);
+        /** 默认分级：普通玩家 4 块 / 8x4.5，VIP 8 块 / 16x9 且限定比例。 */
+        public static final List<Tier> DEFAULT_TIERS = List.of(
+                new Tier("default", "", 4, 8.0D, 4.5D, 0.0D, List.of()),
+                new Tier("vip", "mikuvideo.tier.vip", 8, 16.0D, 9.0D, 0.0D,
+                        List.of("16:9", "4:3", "21:9", "1:1")));
+
+        public static final Limits DEFAULTS = new Limits(8, 16.0D, 9.0D, 0.5D, 0.5D,
+                Protocol.MAX_SCREEN_COUNT, DEFAULT_TIERS);
 
         public Limits {
             maxScreensPerPlayer = clamp(maxScreensPerPlayer, 1, 1000);
@@ -47,6 +58,7 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
             minScreenHeight = clamp(minScreenHeight, 0.5D, 16.0D);
             maxScreenWidth = clamp(maxScreenWidth, minScreenWidth, 64.0D);
             maxScreenHeight = clamp(maxScreenHeight, minScreenHeight, 64.0D);
+            tiers = tiers == null ? List.of() : List.copyOf(tiers);
         }
 
         public double clampWidth(double value) {
@@ -55,6 +67,52 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
 
         public double clampHeight(double value) {
             return clamp(value, minScreenHeight, maxScreenHeight);
+        }
+
+        /** 没有任何分级配置时，用全局限制构造一个默认等级。 */
+        public Tier fallbackTier() {
+            return new Tier("default", "", maxScreensPerPlayer, maxScreenWidth, maxScreenHeight, 0.0D, List.of());
+        }
+
+        public List<Tier> effectiveTiers() {
+            return tiers.isEmpty() ? List.of(fallbackTier()) : tiers;
+        }
+    }
+
+    /**
+     * 屏幕等级：按权限匹配，权限为空表示所有玩家的基础等级。
+     *
+     * <p>数值只能收紧全局限制，不能突破 {@link Limits} 的硬上限。</p>
+     */
+    public record Tier(String id, String permission, int maxScreens, double maxWidth, double maxHeight,
+                       double maxArea, List<String> aspects) {
+
+        public Tier {
+            id = blankTo(id, "default");
+            permission = permission == null ? "" : permission.trim();
+            maxScreens = clamp(maxScreens, 0, 1000);
+            maxWidth = clamp(maxWidth, 0.5D, 64.0D);
+            maxHeight = clamp(maxHeight, 0.5D, 64.0D);
+            maxArea = maxArea <= 0.0D ? 0.0D : clamp(maxArea, 0.25D, 4096.0D);
+            aspects = normalizeAspects(aspects);
+        }
+
+        public boolean allowsAspect(double width, double height) {
+            if (aspects.isEmpty() || height <= 0.0D) {
+                return true;
+            }
+            double ratio = width / height;
+            for (String aspect : aspects) {
+                double target = ratioOf(aspect);
+                if (target > 0.0D && Math.abs(ratio - target) / target <= 0.02D) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        public String describeAspects() {
+            return aspects.isEmpty() ? "不限" : String.join(" / ", aspects);
         }
     }
 
@@ -102,6 +160,36 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
         }
     }
 
+    /**
+     * 服务端 B 站凭证下发。
+     *
+     * <p>Cookie 只保存在服务端配置里，按玩家权限与风控规则下发；
+     * 客户端负责加密落盘并绑定当前服务器。</p>
+     */
+    public record Bilibili(String cookie, boolean deliverToClients, boolean requireOnlineMode,
+                           boolean allowOfflineMode, long deliverDelayMs, long refreshCooldownMs,
+                           int maxDeliveriesPerHour, long credentialTtlMillis) {
+
+        public static final Bilibili DEFAULTS = new Bilibili("", true, true, false,
+                1500L, 600000L, 6, 7L * 24L * 3600L * 1000L);
+
+        public Bilibili {
+            cookie = sanitizeCookie(cookie);
+            deliverDelayMs = clamp(deliverDelayMs, 0L, 60000L);
+            refreshCooldownMs = clamp(refreshCooldownMs, 5000L, 86_400_000L);
+            maxDeliveriesPerHour = clamp(maxDeliveriesPerHour, 1, 60);
+            credentialTtlMillis = clamp(credentialTtlMillis, 60_000L, 365L * 24L * 3600L * 1000L);
+        }
+
+        public boolean configured() {
+            return !cookie.isBlank();
+        }
+
+        public long ttlHours() {
+            return Math.max(1L, credentialTtlMillis / 3_600_000L);
+        }
+    }
+
     /** 存储配置。 */
     public record StorageSettings(long saveDebounceMs) {
 
@@ -140,7 +228,7 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
 
     /** 全默认配置。 */
     public static Settings defaults() {
-        return new Settings(Limits.DEFAULTS, SyncSettings.DEFAULTS, Media.DEFAULTS,
+        return new Settings(Limits.DEFAULTS, SyncSettings.DEFAULTS, Media.DEFAULTS, Bilibili.DEFAULTS,
                 StorageSettings.DEFAULTS, Messages.DEFAULTS);
     }
 
@@ -169,7 +257,8 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
                 doubleOf(root, "limits.max-screen-height", 9.0D, 0.5D, 64.0D),
                 doubleOf(root, "limits.min-screen-width", 0.5D, 0.5D, 16.0D),
                 doubleOf(root, "limits.min-screen-height", 0.5D, 0.5D, 16.0D),
-                intOf(root, "limits.max-total-screens", Protocol.MAX_SCREEN_COUNT, 1, Protocol.MAX_SCREEN_COUNT));
+                intOf(root, "limits.max-total-screens", Protocol.MAX_SCREEN_COUNT, 1, Protocol.MAX_SCREEN_COUNT),
+                readTiers(root, 8, 16.0D, 9.0D));
 
         SyncSettings sync = new SyncSettings(
                 doubleOf(root, "sync.view-distance", 64.0D, 4.0D, 512.0D),
@@ -187,6 +276,16 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
                 intOf(root, "media.max-headers", 8, 0, Protocol.MAX_HEADER_COUNT),
                 listOf(root, "media.allowed-header-names", DEFAULT_HEADERS));
 
+        Bilibili bilibili = new Bilibili(
+                root.getString("bilibili.cookie", ""),
+                boolOf(root, "bilibili.deliver-to-clients", true),
+                boolOf(root, "bilibili.require-online-mode", true),
+                boolOf(root, "bilibili.allow-offline-mode", false),
+                longOf(root, "bilibili.deliver-delay-ms", 1500L, 0L, 60000L),
+                longOf(root, "bilibili.refresh-cooldown-ms", 600000L, 5000L, 86400000L),
+                intOf(root, "bilibili.max-deliveries-per-hour", 6, 1, 60),
+                longOf(root, "bilibili.credential-ttl-hours", 168L, 1L, 8760L) * 3600000L);
+
         StorageSettings storage = new StorageSettings(
                 longOf(root, "storage.save-debounce-ms", 1500L, 100L, 60000L));
 
@@ -197,7 +296,83 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
                 root.getString("messages.no-permission"),
                 root.getString("messages.screen-not-found"));
 
-        return new Settings(limits, sync, media, storage, messages);
+        return new Settings(limits, sync, media, bilibili, storage, messages);
+    }
+
+    private static List<Tier> readTiers(ConfigurationSection root, int defaultScreens,
+                                        double defaultWidth, double defaultHeight) {
+        ConfigurationSection section = root.getConfigurationSection("limits.tiers");
+        if (section == null) {
+            // 旧配置没有 tiers：保持全局限制，升级后行为不变
+            return List.of();
+        }
+        List<Tier> tiers = new ArrayList<>();
+        for (String key : section.getKeys(false)) {
+            ConfigurationSection tier = section.getConfigurationSection(key);
+            if (tier == null) {
+                continue;
+            }
+            List<String> aspects = tier.getStringList("aspects");
+            if (aspects.isEmpty()) {
+                String single = tier.getString("aspects");
+                if (single != null && !single.isBlank()) {
+                    aspects = List.of(single);
+                }
+            }
+            tiers.add(new Tier(key, tier.getString("permission", ""),
+                    tier.getInt("max-screens", defaultScreens),
+                    tier.getDouble("max-width", defaultWidth),
+                    tier.getDouble("max-height", defaultHeight),
+                    tier.getDouble("max-area", 0.0D),
+                    aspects));
+        }
+        tiers.sort(Comparator.comparingInt(Tier::maxScreens));
+        return List.copyOf(tiers);
+    }
+
+    private static List<String> normalizeAspects(List<String> values) {
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+        Set<String> unique = new LinkedHashSet<>();
+        for (String value : values) {
+            if (value == null) {
+                continue;
+            }
+            String trimmed = value.trim().replace('/', ':');
+            if (ratioOf(trimmed) > 0.0D) {
+                unique.add(trimmed);
+            }
+        }
+        return List.copyOf(unique);
+    }
+
+    private static double ratioOf(String aspect) {
+        int colon = aspect.indexOf(':');
+        if (colon <= 0) {
+            return -1.0D;
+        }
+        try {
+            double width = Double.parseDouble(aspect.substring(0, colon).trim());
+            double height = Double.parseDouble(aspect.substring(colon + 1).trim());
+            if (!Double.isFinite(width) || !Double.isFinite(height) || width <= 0.0D || height <= 0.0D) {
+                return -1.0D;
+            }
+            return width / height;
+        } catch (NumberFormatException error) {
+            return -1.0D;
+        }
+    }
+
+    private static String sanitizeCookie(String value) {
+        if (value == null) {
+            return "";
+        }
+        String cleaned = value.replace("\r", "").replace("\n", "").trim();
+        if (cleaned.length() > Protocol.MAX_COOKIE) {
+            cleaned = cleaned.substring(0, Protocol.MAX_COOKIE);
+        }
+        return cleaned;
     }
 
     private static int intOf(ConfigurationSection section, String path, int def, int min, int max) {

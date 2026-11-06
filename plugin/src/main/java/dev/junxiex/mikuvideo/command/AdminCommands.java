@@ -48,6 +48,7 @@ public final class AdminCommands {
                                 .executes(context -> remove(context.getSource(),
                                         StringArgumentType.getString(context, "screen")))))
                 .then(Commands.literal("stats").executes(context -> stats(context.getSource())))
+                .then(Commands.literal("bili").executes(context -> bili(context.getSource())))
                 .then(Commands.literal("purge")
                         .then(Commands.argument("world", StringArgumentType.word())
                                 .suggests(worldSuggestions())
@@ -118,6 +119,16 @@ public final class AdminCommands {
         support.reply(source, "<gray>发送失败次数：<white>" + support.sync().sendFailures()
                 + "</white>　平均心跳耗时：" + (rtt < 0L ? "无样本" : rtt + " ms"));
         support.reply(source, "<gray>JVM 内存：" + used + " MiB");
+        return 1;
+    }
+
+    private int bili(CommandSourceStack source) {
+        if (!support.allow(source)) {
+            return 0;
+        }
+        support.reply(source, "<gray>—— B 站凭证 ——");
+        support.reply(source, "<gray>" + support.plugin().cookieService().statusText());
+        support.reply(source, "<gray>获取权限：<white>" + Permissions.BILIBILI_COOKIE + "</white>（默认关闭）");
         return 1;
     }
 

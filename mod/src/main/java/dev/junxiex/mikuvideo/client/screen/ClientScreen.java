@@ -38,6 +38,7 @@ public final class ClientScreen {
 
     private String endedUrl = "";
     private long endedPosition;
+    private volatile boolean forceSeek;
 
     private ResolvedMedia resolved;
     private String resolvedUrl = "";
@@ -79,6 +80,10 @@ public final class ClientScreen {
         }
         if (urlChanged) {
             clearResolved();
+        }
+        if (jumped) {
+            // 服务端主动跳转（seek / 循环回到开头）时立即校正，不必等 7 秒冷却
+            forceSeek = true;
         }
         if (urlChanged || jumped || next.isStopped()) {
             clearEnded();
@@ -277,6 +282,15 @@ public final class ClientScreen {
     public void clearResolved() {
         this.resolved = null;
         this.resolvedUrl = "";
+    }
+
+    /** 取走一次强制校正标记。 */
+    public boolean consumeForceSeek() {
+        if (!forceSeek) {
+            return false;
+        }
+        forceSeek = false;
+        return true;
     }
 
     public long expectedPositionMillis(long serverNow) {

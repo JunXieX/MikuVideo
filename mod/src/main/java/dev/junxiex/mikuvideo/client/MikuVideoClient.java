@@ -3,6 +3,7 @@ package dev.junxiex.mikuvideo.client;
 import com.mojang.blaze3d.platform.InputConstants;
 import dev.junxiex.mikuvideo.client.command.MikuVideoClientCommands;
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
+import dev.junxiex.mikuvideo.client.credential.CredentialService;
 import dev.junxiex.mikuvideo.client.interact.ScreenPicker;
 import dev.junxiex.mikuvideo.client.playback.MediaManager;
 import dev.junxiex.mikuvideo.client.net.ClientNetworking;
@@ -18,6 +19,7 @@ import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
@@ -32,6 +34,7 @@ public final class MikuVideoClient implements ClientModInitializer {
     private static final int STATUS_INTERVAL_TICKS = 40;
 
     private static ClientConfig config = new ClientConfig();
+    private static CredentialService credentials;
     private static boolean warnedMissingFfmpeg;
     private KeyMapping interactKey;
     private int tickCounter;
@@ -40,6 +43,7 @@ public final class MikuVideoClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         config = ClientConfig.load();
+        credentials = new CredentialService(FabricLoader.getInstance().getGameDir());
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
         media().resolver().setDouyinApi(config.douyinApi);
@@ -64,6 +68,9 @@ public final class MikuVideoClient implements ClientModInitializer {
             ScreenRegistry.INSTANCE.clear();
             media().closeAll();
             ClockSync.reset();
+            if (credentials != null) {
+                credentials.onDisconnect();
+            }
         });
 
     }
@@ -95,10 +102,17 @@ public final class MikuVideoClient implements ClientModInitializer {
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
         media().resolver().setDouyinApi(config.douyinApi);
+        if (credentials != null) {
+            credentials.onConfigReload();
+        }
     }
 
     public static MediaManager media() {
         return MediaManager.INSTANCE;
+    }
+
+    public static CredentialService credentials() {
+        return credentials;
     }
 
     private void tick(Minecraft minecraft) {
@@ -146,6 +160,9 @@ public final class MikuVideoClient implements ClientModInitializer {
                 }
                 ClientNetworking.onServerHello();
                 ClockSync.updateFromHello(hello.serverEpochMillis());
+                if (credentials != null) {
+                    credentials.onHello(hello.serverId());
+                }
             }
             case Message.ScreenSyncS2C sync -> ScreenRegistry.INSTANCE.replaceAll(sync.screens());
             case Message.ScreenUpsertS2C upsert -> ScreenRegistry.INSTANCE.upsert(upsert.screen());
@@ -172,6 +189,11 @@ public final class MikuVideoClient implements ClientModInitializer {
                             .append(Component.literal(text).withStyle(color)));
                 }
             }
+            case Message.CredentialS2C credential -> {
+                if (credentials != null) {
+                    credentials.onCredential(credential);
+                }
+            }
             case Message.PingS2C ping -> ClientNetworking.send(new Message.PongC2S(ping.id(), System.currentTimeMillis()));
             default -> {
                 // 客户端不处理服务端以外的消息。
@@ -179,7 +201,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         }
     }
 
-    private static void chat(String text) {
+    public static void chat(String text) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.player != null) {
             minecraft.player.sendSystemMessage(Component.literal("[MikuVideo] ").withStyle(ChatFormatting.AQUA)

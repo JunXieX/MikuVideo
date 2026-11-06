@@ -1,6 +1,7 @@
 package dev.junxiex.mikuvideo.net;
 
 import dev.junxiex.mikuvideo.config.Settings;
+import dev.junxiex.mikuvideo.credential.CookieService;
 import dev.junxiex.mikuvideo.menu.MenuService;
 import dev.junxiex.mikuvideo.permission.Permissions;
 import dev.junxiex.mikuvideo.playback.PlaybackService;
@@ -43,6 +44,7 @@ public final class PacketListener implements PluginMessageListener {
     private final ScreenManager screens;
     private final PlaybackService playback;
     private final MenuService menu;
+    private final CookieService cookieService;
     private final Supplier<Settings> settings;
     private final Tasks tasks;
     /** 解码失败日志的最小间隔，避免恶意客户端刷控制台。 */
@@ -55,13 +57,15 @@ public final class PacketListener implements PluginMessageListener {
     private final Map<UUID, Long> lastHelloAt = new ConcurrentHashMap<>();
 
     public PacketListener(Plugin plugin, ClientRegistry clients, SyncService sync, ScreenManager screens,
-                          PlaybackService playback, MenuService menu, Supplier<Settings> settings, Tasks tasks) {
+                          PlaybackService playback, MenuService menu, CookieService cookieService,
+                          Supplier<Settings> settings, Tasks tasks) {
         this.plugin = plugin;
         this.clients = clients;
         this.sync = sync;
         this.screens = screens;
         this.playback = playback;
         this.menu = menu;
+        this.cookieService = cookieService;
         this.settings = settings == null ? Settings::defaults : settings;
         this.tasks = tasks;
     }
@@ -81,6 +85,7 @@ public final class PacketListener implements PluginMessageListener {
         switch (message) {
             case Message.HelloC2S hello -> handleHello(player, hello);
             case Message.RequestSyncC2S ignored -> handleRequestSync(player);
+            case Message.CredentialRequestC2S ignored -> handleCredentialRequest(player);
             case Message.InteractC2S interact -> handleInteract(player, interact);
             case Message.MediaErrorC2S error -> handleMediaError(player, error);
             case Message.PongC2S pong -> handlePong(player, pong);
@@ -122,6 +127,16 @@ public final class PacketListener implements PluginMessageListener {
                 sync.syncNow(player);
             }
         });
+        if (cookieService != null) {
+            cookieService.scheduleDelivery(player);
+        }
+    }
+
+    private void handleCredentialRequest(Player player) {
+        if (!clients.isRegistered(player.getUniqueId()) || cookieService == null) {
+            return;
+        }
+        cookieService.request(player);
     }
 
     private void handleRequestSync(Player player) {

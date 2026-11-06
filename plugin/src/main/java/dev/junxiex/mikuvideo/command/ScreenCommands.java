@@ -138,11 +138,19 @@ public final class ScreenCommands {
             return;
         }
         Settings.Limits limits = support.settings().limits();
-        float finalWidth = (float) limits.clampWidth(width == null ? DEFAULT_WIDTH : width);
-        float finalHeight = (float) limits.clampHeight(height == null ? DEFAULT_HEIGHT : height);
-        boolean unlimited = player.hasPermission(Permissions.LIMIT_UNLIMITED);
+        double requestedWidth = width == null ? DEFAULT_WIDTH : width;
+        double requestedHeight = height == null ? DEFAULT_HEIGHT : height;
+        int owned = support.screens().countOwned(player.getUniqueId());
+        String rejection = support.limits().validate(player, requestedWidth, requestedHeight, owned);
+        if (rejection != null) {
+            support.error(source, rejection);
+            return;
+        }
+        float finalWidth = (float) limits.clampWidth(requestedWidth);
+        float finalHeight = (float) limits.clampHeight(requestedHeight);
+        int maxOwned = support.limits().tierFor(player).maxScreens();
         ScreenManager.Creation creation = support.screens().create(player.getUniqueId(), name, hit.get(),
-                finalWidth, finalHeight, DEFAULT_VOLUME, unlimited);
+                finalWidth, finalHeight, DEFAULT_VOLUME, maxOwned);
         switch (creation.error()) {
             case NONE -> {
                 Screen screen = creation.screen();
@@ -199,6 +207,11 @@ public final class ScreenCommands {
         }
         Screen screen = support.require(source, token);
         if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        String rejection = support.limits().validate(source.getSender(), width, height, -1);
+        if (rejection != null) {
+            support.error(source, rejection);
             return 0;
         }
         Settings.Limits limits = support.settings().limits();

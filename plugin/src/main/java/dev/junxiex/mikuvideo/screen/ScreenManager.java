@@ -162,10 +162,10 @@ public final class ScreenManager {
     /**
      * 创建屏幕，写入成功后统一触发监听。
      *
-     * @param unlimited 是否跳过单玩家数量限制（对应 mikuvideo.limit.unlimited）
+     * @param maxOwned 该玩家允许拥有的屏幕数；{@code <= 0} 表示不限制
      */
     public Creation create(UUID owner, String name, ScreenGeometry.Hit hit, float width, float height,
-                           int volume, boolean unlimited) {
+                           int volume, int maxOwned) {
         if (owner == null || hit == null || name == null) {
             return new Creation(null, CreateError.INVALID);
         }
@@ -175,7 +175,7 @@ public final class ScreenManager {
             if (byId.size() >= limits.maxTotalScreens()) {
                 return new Creation(null, CreateError.LIMIT);
             }
-            if (!unlimited && countOwned(owner) >= limits.maxScreensPerPlayer()) {
+            if (maxOwned > 0 && countOwned(owner) >= maxOwned) {
                 return new Creation(null, CreateError.LIMIT);
             }
             for (Screen existing : inWorld(hit.world())) {

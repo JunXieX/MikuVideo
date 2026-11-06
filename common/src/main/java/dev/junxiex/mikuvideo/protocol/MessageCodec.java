@@ -29,6 +29,7 @@ public final class MessageCodec {
                     out.writeInt(hello.flags());
                     writeString(out, hello.serverName(), 128);
                     writeString(out, hello.downloadUrl(), Protocol.MAX_URL);
+                    writeString(out, hello.serverId(), Protocol.MAX_SERVER_ID);
                 }
                 case Message.ScreenSyncS2C sync -> {
                     out.writeInt(sync.screens().size());
@@ -49,6 +50,12 @@ public final class MessageCodec {
                 case Message.ClearS2C ignored -> {
                 }
                 case Message.PingS2C ping -> out.writeLong(ping.id());
+                case Message.CredentialS2C credential -> {
+                    writeString(out, credential.serverId(), Protocol.MAX_SERVER_ID);
+                    writeString(out, credential.cookie(), Protocol.MAX_COOKIE);
+                    out.writeLong(credential.issuedAt());
+                    out.writeLong(credential.expiresAt());
+                }
                 case Message.HelloC2S hello -> {
                     out.writeInt(hello.protocolVersion());
                     writeString(out, hello.modVersion(), Protocol.MAX_MOD_VERSION);
@@ -72,6 +79,8 @@ public final class MessageCodec {
                     out.writeLong(duration.durationMillis());
                 }
                 case Message.RequestSyncC2S ignored -> {
+                }
+                case Message.CredentialRequestC2S ignored -> {
                 }
             }
         } catch (IOException e) {
@@ -99,7 +108,8 @@ public final class MessageCodec {
                         in.readLong(),
                         in.readInt(),
                         readString(in, 128),
-                        readString(in, Protocol.MAX_URL));
+                        readString(in, Protocol.MAX_URL),
+                        readString(in, Protocol.MAX_SERVER_ID));
                 case Protocol.S2C_SCREEN_SYNC -> {
                     int count = readCount(in, Protocol.MAX_SCREEN_COUNT);
                     List<ScreenInfo> screens = new ArrayList<>(count);
@@ -116,6 +126,11 @@ public final class MessageCodec {
                 case Protocol.S2C_NOTICE -> new Message.NoticeS2C(in.readUnsignedByte(), readString(in, Protocol.MAX_NOTICE));
                 case Protocol.S2C_CLEAR -> new Message.ClearS2C();
                 case Protocol.S2C_PING -> new Message.PingS2C(in.readLong());
+                case Protocol.S2C_CREDENTIAL -> new Message.CredentialS2C(
+                        readString(in, Protocol.MAX_SERVER_ID),
+                        readString(in, Protocol.MAX_COOKIE),
+                        in.readLong(),
+                        in.readLong());
                 case Protocol.C2S_HELLO -> new Message.HelloC2S(
                         in.readInt(),
                         readString(in, Protocol.MAX_MOD_VERSION),
@@ -130,6 +145,7 @@ public final class MessageCodec {
                 case Protocol.C2S_PONG -> new Message.PongC2S(in.readLong(), in.readLong());
                 case Protocol.C2S_DURATION -> new Message.DurationC2S(readString(in, Protocol.MAX_SCREEN_ID), in.readLong());
                 case Protocol.C2S_REQUEST_SYNC -> new Message.RequestSyncC2S();
+                case Protocol.C2S_CREDENTIAL_REQUEST -> new Message.CredentialRequestC2S();
                 default -> throw new ProtocolException("未知操作码: " + op);
             };
             if (in.available() > 0) {

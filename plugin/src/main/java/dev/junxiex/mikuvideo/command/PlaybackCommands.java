@@ -64,10 +64,22 @@ public final class PlaybackCommands {
 
         root.then(Commands.literal("seek")
                 .then(screenArguments.screenArgument("screen")
-                        .then(Commands.argument("seconds", DoubleArgumentType.doubleArg(0.0D, 86400.0D))
+                        .then(Commands.argument("position", StringArgumentType.greedyString())
                                 .executes(context -> seek(context.getSource(),
                                         StringArgumentType.getString(context, "screen"),
-                                        DoubleArgumentType.getDouble(context, "seconds"))))));
+                                        StringArgumentType.getString(context, "position"))))));
+
+        root.then(Commands.literal("loop")
+                .then(screenArguments.screenArgument("screen")
+                        .then(Commands.literal("on")
+                                .executes(context -> loop(context.getSource(),
+                                        StringArgumentType.getString(context, "screen"), true)))
+                        .then(Commands.literal("off")
+                                .executes(context -> loop(context.getSource(),
+                                        StringArgumentType.getString(context, "screen"), false)))
+                        .then(Commands.literal("toggle")
+                                .executes(context -> loop(context.getSource(),
+                                        StringArgumentType.getString(context, "screen"), null)))));
     }
 
     private int play(CommandContext<CommandSourceStack> context) {
@@ -208,12 +220,17 @@ public final class PlaybackCommands {
         return 1;
     }
 
-    private int seek(CommandSourceStack source, String token, double seconds) {
+    private int seek(CommandSourceStack source, String token, String rawPosition) {
         if (!support.allow(source)) {
             return 0;
         }
         Screen screen = support.require(source, token);
         if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        double seconds = parsePosition(rawPosition);
+        if (seconds < 0.0D) {
+            support.error(source, "时间格式：秒、mm:ss 或 hh:mm:ss");
             return 0;
         }
         if (!support.playback().seek(screen, seconds)) {
@@ -246,6 +263,42 @@ public final class PlaybackCommands {
             return new String[]{first, referer};
         }
         return new String[]{Urls.extractUrl(text), null};
+    }
+
+    /** 循环播放开关。 */
+    private int loop(CommandSourceStack source, String token, Boolean value) {
+        if (!support.allow(source)) {
+            return 0;
+        }
+        Screen screen = support.require(source, token);
+        if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        boolean enabled = value == null ? !screen.loop() : value;
+        support.screens().replace(screen.withLoop(enabled));
+        support.reply(source, enabled ? "<green>已开启循环播放" : "<yellow>已关闭循环播放");
+        return 1;
+    }
+
+    /** 解析秒数、{@code mm:ss} 或 {@code hh:mm:ss}。 */
+    private static double parsePosition(String raw) {
+        String text = raw == null ? "" : raw.trim();
+        String[] parts = text.split(":");
+        try {
+            if (parts.length == 1) {
+                double seconds = Double.parseDouble(parts[0]);
+                return Double.isFinite(seconds) && seconds >= 0.0D ? seconds : -1.0D;
+            }
+            if (parts.length == 2) {
+                return Long.parseLong(parts[0]) * 60.0D + Double.parseDouble(parts[1]);
+            }
+            if (parts.length == 3) {
+                return Long.parseLong(parts[0]) * 3600.0D + Long.parseLong(parts[1]) * 60.0D
+                        + Double.parseDouble(parts[2]);
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return -1.0D;
     }
 
     /** 便于外部复用的 URL 上限提示。 */

@@ -15,6 +15,27 @@ limits:
   max-screen-height: 9.0
   # 全服屏幕总数上限，同时受协议上限 512 约束
   max-total-screens: 512
+  # 分级限制：按权限匹配，取匹配到的最高等级；数值只能收紧上面的全局上限
+  # permission 留空表示基础等级；aspects 留空表示不限比例
+  tiers:
+    default:
+      permission: ''
+      max-screens: 4
+      max-width: 8.0
+      max-height: 4.5
+      max-area: 0
+      aspects: []
+    vip:
+      permission: 'mikuvideo.tier.vip'
+      max-screens: 8
+      max-width: 16.0
+      max-height: 9.0
+      max-area: 0
+      aspects:
+        - '16:9'
+        - '4:3'
+        - '21:9'
+        - '1:1'
 
 sync:
   # 玩家能看到多远的屏幕，按屏幕中心点到玩家眼睛的距离计算（格）
@@ -52,6 +73,25 @@ media:
     - Origin
     - Cookie
     - Authorization
+
+bilibili:
+  # 服务端持有的 B 站 Cookie，用于向玩家下发 1080p+ / 大会员权限
+  # 格式：SESSDATA=xxx; bili_jct=xxx; buvid3=xxx
+  # 留空表示不分发；Cookie 只存在于服务端，客户端加密保存并绑定本服 server-id.txt
+  cookie: ''
+  # 是否允许下发（关闭后即使配置了 Cookie 也不会发给客户端）
+  deliver-to-clients: true
+  # 要求服务端开启正版验证；离线模式服请显式打开 allow-offline-mode
+  require-online-mode: true
+  allow-offline-mode: false
+  # 玩家进服后延迟多久下发（毫秒），给客户端留出握手时间
+  deliver-delay-ms: 1500
+  # 同一玩家两次主动刷新之间的最小间隔（毫秒）
+  refresh-cooldown-ms: 600000
+  # 同一玩家每小时最多获取次数
+  max-deliveries-per-hour: 6
+  # 客户端凭证有效期（小时），到期后需重新获取
+  credential-ttl-hours: 168
 
 storage:
   # 写盘合并延迟（毫秒）：短时间内的多次改动只落盘一次

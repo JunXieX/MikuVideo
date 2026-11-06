@@ -12,10 +12,13 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 - **每名玩家管理自己的屏幕**：位置、尺寸、朝向、音量、公开/私有；完整图形菜单与命令两套入口。
 - **B 站原生解析**：视频、番剧、直播、分 P、`av`/`BV`/`ep`/`ss`/短链，WBI 签名直连官方 API，输出 DASH 音视频双流，支持 360p～8K 画质档位。
-- **B 站搜索**：聊天栏输入关键词，结果可点击直接播放到指定屏幕。
+- **B 站搜索**：聊天栏输入关键词，结果可点击直接播放到指定屏幕；服务端凭证可自动用于搜索与解析。
 - **抖音支持**：直播间原生抓取 HLS/FLV；视频走可配置解析接口，接口可换成自建服务或关闭。
 - **服务端权威时间线**：所有人按同一时间点播放，每 5 秒纠偏，晚进服自动追上进度。
 - **播放队列**：每块屏幕独立队列，播完自动切下一项，**重启后队列仍在**。
+- **循环播放**：单屏开关，播到结尾自动从头开始；命令与图形菜单都能控制。
+- **B 站凭证下发**：服主把 Cookie 写进服务端配置，按权限下发给玩家；客户端 AES-GCM 加密保存，绑定服务器与机器，换服无法复用。
+- **分级屏幕权限**：按权限配置每位玩家能创建的屏幕数量、最大尺寸与允许比例，等级只能收紧全局上限。
 - **客户端本地解码**：内置 FFmpeg 9.0（Windows/Linux x64），子进程解码，不占服务端资源。
 - **解码预算**：同时解码屏幕数、分辨率、帧率、码率上限均可配；看不见的屏幕自动停解码。
 - **Paper 与 Folia 共用一个 jar**：全部走区域化调度器，没有 `BukkitScheduler`。
@@ -36,7 +39,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.5.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.6.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -46,7 +49,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.5.jar` 放进 `mods/`。
+2. 把 `MikuVideo-Client-1.0.6.jar` 放进 `mods/`。
 3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
@@ -72,6 +75,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `limits.min-screen-width` / `min-screen-height` | 0.5 | 最小边长（格） |
 | `limits.max-screen-width` / `max-screen-height` | 16 / 9 | 最大边长（格） |
 | `limits.max-total-screens` | 512 | 全服屏幕上限，协议硬上限也是 512 |
+| `limits.tiers.<等级>.*` | default / vip | 分级限制：`permission`、`max-screens`、`max-width`、`max-height`、`max-area`、`aspects` |
 | `sync.view-distance` | 64 | 玩家能看到多远的屏幕（格） |
 | `sync.rescan-interval-ticks` | 10 | 可见集合重扫间隔（tick） |
 | `sync.rebroadcast-interval-ms` | 5000 | 播放中时间线纠偏间隔（毫秒） |
@@ -84,6 +88,14 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `media.max-url-length` | 1024 | 链接最大长度 |
 | `media.max-headers` | 8 | 单次播放携带的请求头上限 |
 | `media.allowed-header-names` | Referer, User-Agent, Origin, Cookie, Authorization | 允许透传的请求头 |
+| `bilibili.cookie` | 空 | 服务端持有的 B 站 Cookie；留空不分发 |
+| `bilibili.deliver-to-clients` | true | 是否允许下发给客户端 |
+| `bilibili.require-online-mode` | true | 要求服务端正版验证；离线服需显式打开 `allow-offline-mode` |
+| `bilibili.allow-offline-mode` | false | 离线模式是否仍下发（不推荐） |
+| `bilibili.deliver-delay-ms` | 1500 | 进服后延迟下发时间（毫秒） |
+| `bilibili.refresh-cooldown-ms` | 600000 | 同一玩家主动刷新的最小间隔 |
+| `bilibili.max-deliveries-per-hour` | 6 | 同一玩家每小时最多获取次数 |
+| `bilibili.credential-ttl-hours` | 168 | 客户端凭证有效期（小时） |
 | `storage.save-debounce-ms` | 1500 | 合并写盘延迟（毫秒） |
 | `messages.*` | 见文件 | 提示文案，支持 MiniMessage |
 
@@ -106,7 +118,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mv volume <屏幕> <0-100>` | 设置音量 |
 | `/mv play <屏幕> <链接> [Referer]` | 播放链接 |
 | `/mv pause <屏幕>` / `resume` / `stop` | 暂停 / 继续 / 停止 |
-| `/mv seek <屏幕> <秒>` | 跳转 |
+| `/mv seek <屏幕> <秒\|mm:ss\|hh:mm:ss>` | 跳转 |
+| `/mv loop <屏幕> on\|off\|toggle` | 循环播放开关 |
 | `/mv queue add <屏幕> <链接>` | 追加播放队列（最多 64 项，重启保留） |
 | `/mv queue list <屏幕>` | 查看队列 |
 | `/mv queue next <屏幕>` | 立即切到下一项 |
@@ -115,6 +128,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mv admin list [页码]` | 全服屏幕列表 |
 | `/mv admin remove <屏幕>` | 强制删除屏幕 |
 | `/mv admin stats` | 运行统计 |
+| `/mv admin bili` | 查看 B 站凭证下发状态（不显示 Cookie） |
 | `/mv admin purge <世界>` | 清空某个世界的屏幕 |
 
 屏幕参数支持完整 ID、ID 前缀或名称。
@@ -132,6 +146,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mikuvideo-client quality <360\|480\|720\|1080\|best>` | 网页视频解析高度上限 |
 | `/mikuvideo-client search <屏幕> <关键词>` | 搜索 B 站视频，点击结果直接播放到指定屏幕 |
 | `/mikuvideo-client douyinapi <接口\|default\|off>` | 设置抖音视频解析接口，`off` 关闭（直播不受影响） |
+| `/mikuvideo-client credential status\|refresh\|clear` | 查看 / 重新申请 / 清除本服 B 站凭证 |
 | `/mikuvideo-client resolver` | 查看当前解析链路状态 |
 | `/mikuvideo-client reload` | 重载客户端配置 |
 
@@ -145,6 +160,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `mikuvideo.manage.others` | OP | 管理其他玩家的屏幕 |
 | `mikuvideo.admin` | OP | 管理子命令 |
 | `mikuvideo.limit.unlimited` | OP | 不受单玩家数量限制 |
+| `mikuvideo.bilibili.cookie` | 无 | 允许获取服务端 B 站凭证；默认关闭，需服主授予 |
+| `mikuvideo.tier.<等级>` | 无 | 配置里声明的屏幕等级权限，默认关闭 |
 
 ## 视频源说明
 
@@ -176,6 +193,59 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
   - 换成自建服务：`/mikuvideo-client douyinapi https://your-api.example.com/parse?url={url}`，`{url}` 会被替换为编码后的视频地址；接口返回 JSON 即可，视频地址从 `data.item.url`、`data.url`、`data.video.url` 中取第一个可用值。
   - 关闭：`/mikuvideo-client douyinapi off`，此时只支持抖音直播。
 - 分享文案可以整段粘贴，服务端会自动提取其中的链接。
+
+### 服务端 B 站凭证
+
+服主把 B 站 Cookie 写进 `plugins/MikuVideo/config.yml` 的 `bilibili.cookie`，重启或 `/mv admin reload` 后生效：
+
+```yaml
+bilibili:
+  cookie: 'SESSDATA=xxx; bili_jct=xxx; buvid3=xxx'
+  deliver-to-clients: true
+  require-online-mode: true
+  max-deliveries-per-hour: 6
+```
+
+玩家需要 `mikuvideo.bilibili.cookie` 权限（默认关闭）：
+
+```text
+/lp user <玩家> permission set mikuvideo.bilibili.cookie true
+```
+
+安全设计：
+
+- Cookie 只存在于服务端配置，命令与日志都不会打印它的值。
+- 下发前校验权限、正版验证与频率（每人每小时 6 次、刷新间隔 10 分钟）。
+- 客户端用 AES-256-GCM 加密保存到 `config/mikuvideo-credentials.json`，密钥由机器指纹派生；文件复制到别的机器无法解密。
+- 凭证同时绑定服务端 `server-id.txt` 的 ID 与服务器地址哈希，换服后自动失效。
+- 默认有效期 7 天，过期后客户端自动续期一次；玩家可用 `/mikuvideo-client credential clear` 主动清除。
+
+### 屏幕等级与尺寸限制
+
+`limits.tiers` 按权限匹配，取匹配到的最高等级；等级只能收紧全局上限：
+
+```yaml
+limits:
+  max-screen-width: 16.0
+  max-screen-height: 9.0
+  tiers:
+    default:
+      permission: ''
+      max-screens: 4
+      max-width: 8.0
+      max-height: 4.5
+      aspects: []
+    vip:
+      permission: 'mikuvideo.tier.vip'
+      max-screens: 8
+      max-width: 16.0
+      max-height: 9.0
+      aspects: ['16:9', '4:3', '21:9', '1:1']
+```
+
+- `aspects` 为空表示不限比例；否则创建/调整尺寸时必须匹配其中一个比例（容差 2%）。
+- 没有匹配到任何等级的玩家按 0 块处理，避免绕过权限。
+- `mikuvideo.limit.unlimited` 直接获得全局上限。
 
 ### 直链视频
 

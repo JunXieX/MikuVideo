@@ -28,6 +28,7 @@ public final class ClientConfig {
     public boolean audioEnabled = true;
     public boolean autoDownloadFfmpeg = false;
     public boolean allowPrivateHosts = false;
+    public boolean acceptServerCookie = true;
     public boolean debug = false;
     public String ffmpegPath = "";
     public String cookiesFile = "";

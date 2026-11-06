@@ -188,7 +188,10 @@ public final class MediaManager {
             return;
         }
         long now = System.currentTimeMillis();
-        if (!playback.paused() && entry.lastSeekAt + SEEK_COOLDOWN_MS < now) {
+        if (screen.consumeForceSeek()) {
+            session.seek(expected);
+            entry.lastSeekAt = now;
+        } else if (!playback.paused() && entry.lastSeekAt + SEEK_COOLDOWN_MS < now) {
             long actual = session.positionMillis();
             if (actual > 0L && (expected - actual > BEHIND_TOLERANCE_MS || actual - expected > AHEAD_TOLERANCE_MS)) {
                 session.seek(expected);

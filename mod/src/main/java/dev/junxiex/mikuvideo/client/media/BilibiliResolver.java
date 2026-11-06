@@ -67,12 +67,20 @@ public final class BilibiliResolver implements MediaResolver {
 
     /** 关键词搜索，供客户端搜索命令使用。 */
     public List<BilibiliSearchItem> search(String keyword, int page, Path cookiesFile, String proxy) throws Exception {
+        return search(keyword, page, cookiesFile, "", proxy);
+    }
+
+    /** 带服务端凭证的搜索。 */
+    public List<BilibiliSearchItem> search(String keyword, int page, Path cookiesFile, String serverCookie,
+                                           String proxy) throws Exception {
+        CookieSource cookies = new CookieSource(cookiesFile, serverCookie);
         HttpClient client = client(proxy);
         Map<String, String> params = new LinkedHashMap<>();
         params.put("search_type", "video");
         params.put("keyword", keyword);
         params.put("page", Integer.toString(Math.max(1, page)));
-        JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/wbi/search/type?" + signedQuery(params, cookiesFile), cookiesFile);
+        JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/wbi/search/type?"
+                + signedQuery(params, cookies), cookies);
         JsonObject data = root.getAsJsonObject("data");
         JsonArray result = data == null ? null : data.getAsJsonArray("result");
         if (result == null) {
@@ -115,6 +123,13 @@ public final class BilibiliResolver implements MediaResolver {
 
     @Override
     public ResolvedMedia resolve(String url, Path cookiesFile, int maxHeight, String proxy) throws Exception {
+        return resolve(url, cookiesFile, "", maxHeight, proxy);
+    }
+
+    /** 带服务端凭证的解析。服务端 Cookie 与本地 cookies.txt 合并，同名以服务端为准。 */
+    public ResolvedMedia resolve(String url, Path cookiesFile, String serverCookie, int maxHeight,
+                                 String proxy) throws Exception {
+        CookieSource cookies = new CookieSource(cookiesFile, serverCookie);
         HttpClient client = client(proxy);
         URI uri = URI.create(resolveShortLink(client, url));
         String host = uri.getHost() == null ? "" : uri.getHost().toLowerCase(Locale.ROOT);
@@ -129,32 +144,32 @@ public final class BilibiliResolver implements MediaResolver {
         Matcher live = LIVE.matcher(path);
         int page = queryInt(uri.getRawQuery(), "p", 1);
         if (host.startsWith("live.") && live.find()) {
-            return resolveLive(client, Long.parseLong(live.group(1)), cookiesFile);
+            return resolveLive(client, Long.parseLong(live.group(1)), cookies);
         }
         if (bv.find()) {
-            return resolveVod(client, bv.group(1), null, page, cookiesFile, maxHeight);
+            return resolveVod(client, bv.group(1), null, page, cookies, maxHeight);
         }
         if (av.find()) {
-            return resolveVod(client, null, Long.parseLong(av.group(1)), page, cookiesFile, maxHeight);
+            return resolveVod(client, null, Long.parseLong(av.group(1)), page, cookies, maxHeight);
         }
         if (ep.find()) {
-            return resolveBangumi(client, Long.parseLong(ep.group(1)), null, cookiesFile, maxHeight);
+            return resolveBangumi(client, Long.parseLong(ep.group(1)), null, cookies, maxHeight);
         }
         if (season.find()) {
-            return resolveBangumi(client, null, Long.parseLong(season.group(1)), cookiesFile, maxHeight);
+            return resolveBangumi(client, null, Long.parseLong(season.group(1)), cookies, maxHeight);
         }
         throw new IOException("无法识别的 B 站链接");
     }
 
     private ResolvedMedia resolveVod(HttpClient client, String bvid, Long avid, int page,
-                                     Path cookiesFile, int maxHeight) throws Exception {
+                                     CookieSource cookies, int maxHeight) throws Exception {
         Map<String, String> query = new LinkedHashMap<>();
         if (bvid != null) {
             query.put("bvid", bvid);
         } else {
             query.put("aid", String.valueOf(avid));
         }
-        JsonObject data = data(client, "https://api.bilibili.com/x/web-interface/view?" + plainQuery(query), cookiesFile);
+        JsonObject data = data(client, "https://api.bilibili.com/x/web-interface/view?" + plainQuery(query), cookies);
         String resolvedBvid = optString(data, "bvid");
         if (resolvedBvid.isBlank()) {
             resolvedBvid = bvid;
@@ -180,7 +195,7 @@ public final class BilibiliResolver implements MediaResolver {
         playParams.put("fourk", "1");
         playParams.put("platform", "pc");
         playParams.put("high_quality", "1");
-        JsonObject play = data(client, "https://api.bilibili.com/x/player/playurl?" + signedQuery(playParams, cookiesFile), cookiesFile);
+        JsonObject play = data(client, "https://api.bilibili.com/x/player/playurl?" + signedQuery(playParams, cookies), cookies);
         String title = optString(data, "title");
         long duration = optLong(data, "duration", 0L) * 1000L;
         String referer = "https://www.bilibili.com/video/" + resolvedBvid;
@@ -192,14 +207,14 @@ public final class BilibiliResolver implements MediaResolver {
     }
 
     private ResolvedMedia resolveBangumi(HttpClient client, Long epId, Long seasonId,
-                                         Path cookiesFile, int maxHeight) throws Exception {
+                                         CookieSource cookies, int maxHeight) throws Exception {
         Map<String, String> query = new LinkedHashMap<>();
         if (epId != null) {
             query.put("ep_id", String.valueOf(epId));
         } else {
             query.put("season_id", String.valueOf(seasonId));
         }
-        JsonObject root = root(client, "https://api.bilibili.com/pgc/view/web/season?" + plainQuery(query), cookiesFile);
+        JsonObject root = root(client, "https://api.bilibili.com/pgc/view/web/season?" + plainQuery(query), cookies);
         JsonObject result = root.has("result") ? root.getAsJsonObject("result") : null;
         if (result == null) {
             throw new IOException("B 站番剧信息不可用");
@@ -230,7 +245,8 @@ public final class BilibiliResolver implements MediaResolver {
         params.put("fnval", "12240");
         params.put("fourk", "1");
         params.put("qn", "127");
-        JsonObject rootPlay = root(client, "https://api.bilibili.com/pgc/player/web/v2/playurl?" + signedQuery(params, cookiesFile), cookiesFile);
+        JsonObject rootPlay = root(client, "https://api.bilibili.com/pgc/player/web/v2/playurl?"
+                + signedQuery(params, cookies), cookies);
         JsonObject playResult = rootPlay.has("result") ? rootPlay.getAsJsonObject("result") : null;
         JsonObject videoInfo = playResult == null ? null : playResult.getAsJsonObject("video_info");
         String title = optString(result, "title");
@@ -247,14 +263,14 @@ public final class BilibiliResolver implements MediaResolver {
         return media;
     }
 
-    private ResolvedMedia resolveLive(HttpClient client, long roomId, Path cookiesFile) throws Exception {
-        JsonObject info = data(client, "https://api.live.bilibili.com/room/v1/Room/get_info?room_id=" + roomId, cookiesFile);
+    private ResolvedMedia resolveLive(HttpClient client, long roomId, CookieSource cookies) throws Exception {
+        JsonObject info = data(client, "https://api.live.bilibili.com/room/v1/Room/get_info?room_id=" + roomId, cookies);
         String title = optString(info, "title");
         if (optInt(info, "live_status", 0) != 1) {
             throw new IOException("B 站直播间当前未开播");
         }
         JsonObject play = data(client, "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo"
-                + "?room_id=" + roomId + "&protocol=0,1&format=0,1,2&codec=0,1&qn=10000", cookiesFile);
+                + "?room_id=" + roomId + "&protocol=0,1&format=0,1,2&codec=0,1&qn=10000", cookies);
         JsonObject playurl = optObject(optObject(play, "playurl_info"), "playurl");
         JsonArray streams = playurl == null ? null : playurl.getAsJsonArray("stream");
         if (streams == null) {
@@ -505,18 +521,18 @@ public final class BilibiliResolver implements MediaResolver {
         return builder.build();
     }
 
-    private JsonObject data(HttpClient client, String url, Path cookiesFile) throws Exception {
-        return requireData(root(client, url, cookiesFile), "B 站 API");
+    private JsonObject data(HttpClient client, String url, CookieSource cookies) throws Exception {
+        return requireData(root(client, url, cookies), "B 站 API");
     }
 
-    private JsonObject root(HttpClient client, String url, Path cookiesFile) throws Exception {
+    private JsonObject root(HttpClient client, String url, CookieSource cookies) throws Exception {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(url))
                 .timeout(Duration.ofSeconds(20))
                 .header("User-Agent", UA)
                 .header("Referer", REFERER)
                 .header("Accept", "application/json, text/plain, */*")
                 .GET();
-        String cookie = cookieHeader(cookiesFile);
+        String cookie = cookieHeader(cookies);
         if (!cookie.isBlank()) {
             builder.header("Cookie", cookie);
         }
@@ -543,7 +559,7 @@ public final class BilibiliResolver implements MediaResolver {
         return data;
     }
 
-    private String signedQuery(Map<String, String> params, Path cookiesFile) {
+    private String signedQuery(Map<String, String> params, CookieSource cookies) {
         Map<String, String> all = new LinkedHashMap<>(params);
         all.put("wts", Long.toString(System.currentTimeMillis() / 1000L));
         List<String> keys = new ArrayList<>(all.keySet());
@@ -555,7 +571,7 @@ public final class BilibiliResolver implements MediaResolver {
             }
             base.append(urlEncode(key)).append('=').append(urlEncode(filterValue(all.get(key))));
         }
-        WbiKeys wbi = wbiKeys(cookiesFile);
+        WbiKeys wbi = wbiKeys(cookies);
         if (wbi == null) {
             return base.toString();
         }
@@ -563,7 +579,7 @@ public final class BilibiliResolver implements MediaResolver {
         return base + "&w_rid=" + wRid;
     }
 
-    private WbiKeys wbiKeys(Path cookiesFile) {
+    private WbiKeys wbiKeys(CookieSource cookies) {
         long now = System.currentTimeMillis();
         WbiKeys cached = wbiKeys;
         if (cached != null && now - wbiFetchedAt < 20L * 60L * 60L * 1000L) {
@@ -572,7 +588,7 @@ public final class BilibiliResolver implements MediaResolver {
         try {
             HttpClient client = client("");
             // 未登录时 nav 会返回 code=-101，但 data.wbi_img 仍然存在，不能按业务错误丢弃。
-            JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/nav", cookiesFile);
+            JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/nav", cookies);
             JsonObject data = root.getAsJsonObject("data");
             JsonObject wbi = data == null ? null : data.getAsJsonObject("wbi_img");
             if (wbi == null) {
@@ -655,6 +671,41 @@ public final class BilibiliResolver implements MediaResolver {
             return builder.toString();
         } catch (Exception error) {
             return "";
+        }
+    }
+
+    /** 本地 cookies.txt + 服务端下发凭证；同名时服务端优先。 */
+    private static String cookieHeader(CookieSource source) {
+        if (source == null) {
+            return "";
+        }
+        String fromFile = cookieHeader(source.file());
+        String extra = source.header() == null ? "" : source.header().trim();
+        if (extra.isEmpty()) {
+            return fromFile;
+        }
+        if (fromFile.isEmpty()) {
+            return extra;
+        }
+        Map<String, String> merged = new LinkedHashMap<>();
+        parseCookieHeader(fromFile, merged);
+        parseCookieHeader(extra, merged);
+        StringBuilder builder = new StringBuilder();
+        for (Map.Entry<String, String> entry : merged.entrySet()) {
+            if (builder.length() > 0) {
+                builder.append("; ");
+            }
+            builder.append(entry.getKey()).append('=').append(entry.getValue());
+        }
+        return builder.toString();
+    }
+
+    private static void parseCookieHeader(String header, Map<String, String> output) {
+        for (String part : header.split(";")) {
+            int equals = part.indexOf('=');
+            if (equals > 0) {
+                output.put(part.substring(0, equals).trim(), part.substring(equals + 1).trim());
+            }
         }
     }
 
@@ -748,6 +799,9 @@ public final class BilibiliResolver implements MediaResolver {
         } catch (RuntimeException error) {
             return fallback;
         }
+    }
+
+    private record CookieSource(Path file, String header) {
     }
 
     private record WbiKeys(String imgKey, String subKey) {

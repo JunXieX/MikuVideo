@@ -103,7 +103,8 @@ public final class CommandService {
         support.reply(source, "<white>/mv create <名称> [宽] [高]</white> <dark_gray>·</dark_gray> 看向方块面创建");
         support.reply(source, "<white>/mv remove|rename|size|move|access|volume</white> <dark_gray>·</dark_gray> 维护屏幕");
         support.reply(source, "<white>/mv play <屏幕> <链接> [Referer]</white> <dark_gray>·</dark_gray> 播放");
-        support.reply(source, "<white>/mv pause|resume|stop|seek <屏幕> [秒]</white> <dark_gray>·</dark_gray> 播放控制");
+        support.reply(source, "<white>/mv pause|resume|stop|seek <屏幕> [秒|mm:ss]</white> <dark_gray>·</dark_gray> 播放控制");
+        support.reply(source, "<white>/mv loop <屏幕> on|off|toggle</white> <dark_gray>·</dark_gray> 循环播放");
         support.reply(source, "<white>/mv queue add|list|clear|next <屏幕></white> <dark_gray>·</dark_gray> 播放队列（播完自动切下一项）");
         support.reply(source, "<white>/mv admin reload|list|remove|stats|purge</white> <dark_gray>·</dark_gray> 管理命令");
     }
@@ -158,7 +159,8 @@ public final class CommandService {
                 + Text.number(screen.ny()) + ", " + Text.number(screen.nz()) + "</white>　尺寸：<white>"
                 + screen.width() + " x " + screen.height() + "</white>");
         support.reply(source, "<gray>可见性：<white>" + (screen.publicScreen() ? "公开" : "私有")
-                + "</white>　音量：<white>" + screen.volume() + "</white>");
+                + "</white>　音量：<white>" + screen.volume() + "</white>　循环：<white>"
+                + (screen.loop() ? "开" : "关") + "</white>");
         support.reply(source, "<gray>链接：<white>" + (state.isStopped() ? "未设置" : state.url()) + "</white>");
         support.reply(source, "<gray>状态：<white>" + (state.isStopped() ? "未播放" : (state.paused() ? "暂停" : "播放中")) + "</white>　进度：<white>"
                 + Text.duration(position) + " / "

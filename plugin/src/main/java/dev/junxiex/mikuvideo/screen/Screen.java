@@ -38,6 +38,7 @@ public record Screen(
         float height,
         int volume,
         boolean publicScreen,
+        boolean loop,
         long createdAt
 ) {
 
@@ -68,7 +69,7 @@ public record Screen(
                 basis.normal().getX(), basis.normal().getY(), basis.normal().getZ(),
                 basis.right().getX(), basis.right().getY(), basis.right().getZ(),
                 basis.up().getX(), basis.up().getY(), basis.up().getZ(),
-                width, height, volume, true, now);
+                width, height, volume, true, false, now);
     }
 
     public Vector center() {
@@ -113,22 +114,22 @@ public record Screen(
 
     public Screen withName(String newName) {
         return new Screen(id, newName, owner, world, cx, cy, cz, nx, ny, nz, rx, ry, rz, ux, uy, uz,
-                width, height, volume, publicScreen, createdAt);
+                width, height, volume, publicScreen, loop, createdAt);
     }
 
     public Screen withSize(float newWidth, float newHeight) {
         return new Screen(id, name, owner, world, cx, cy, cz, nx, ny, nz, rx, ry, rz, ux, uy, uz,
-                newWidth, newHeight, volume, publicScreen, createdAt);
+                newWidth, newHeight, volume, publicScreen, loop, createdAt);
     }
 
     public Screen withVolume(int newVolume) {
         return new Screen(id, name, owner, world, cx, cy, cz, nx, ny, nz, rx, ry, rz, ux, uy, uz,
-                width, height, newVolume, publicScreen, createdAt);
+                width, height, newVolume, publicScreen, loop, createdAt);
     }
 
     public Screen withPublic(boolean visible) {
         return new Screen(id, name, owner, world, cx, cy, cz, nx, ny, nz, rx, ry, rz, ux, uy, uz,
-                width, height, volume, visible, createdAt);
+                width, height, volume, visible, loop, createdAt);
     }
 
     /** 移动到新位置 / 新朝向。 */
@@ -139,7 +140,13 @@ public record Screen(
                 basis.normal().getX(), basis.normal().getY(), basis.normal().getZ(),
                 basis.right().getX(), basis.right().getY(), basis.right().getZ(),
                 basis.up().getX(), basis.up().getY(), basis.up().getZ(),
-                width, height, volume, publicScreen, createdAt);
+                width, height, volume, publicScreen, loop, createdAt);
+    }
+
+    /** 循环播放：播到结尾后从头重新计时。 */
+    public Screen withLoop(boolean enabled) {
+        return new Screen(id, name, owner, world, cx, cy, cz, nx, ny, nz, rx, ry, rz, ux, uy, uz,
+                width, height, volume, publicScreen, enabled, createdAt);
     }
 
     /** 转成协议对象，供同步使用。 */
