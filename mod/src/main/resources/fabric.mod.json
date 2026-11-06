@@ -3,7 +3,7 @@
   "id": "mikuvideo",
   "version": "${version}",
   "name": "MikuVideo Client",
-  "description": "MikuVideo 客户端：在服务器内的屏幕上播放直链或 B 站等网页视频，视频流量不经过服务器。",
+  "description": "MikuVideo 客户端：在服务器内的屏幕上播放 B 站、抖音与直链视频，视频流量不经过服务器。",
   "authors": [
     "JunXieX"
   ],

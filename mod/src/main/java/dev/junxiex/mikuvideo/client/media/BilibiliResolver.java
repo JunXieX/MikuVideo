@@ -34,7 +34,7 @@ import java.util.regex.Pattern;
  * B 站原生解析：直接调用 B 站 web API（WBI 签名），解析视频 / 番剧 / 直播。
  *
  * <p>相比外部解析器，原生路径更快、可控质量档位，也能把 DASH 音视频的请求头
- * 精确交给 FFmpeg；解析失败时上层会回退到 yt-dlp。</p>
+ * 精确交给 FFmpeg；解析失败时由上层把源站原因直接呈现给玩家。</p>
  *
  * @author JunXieX
  */

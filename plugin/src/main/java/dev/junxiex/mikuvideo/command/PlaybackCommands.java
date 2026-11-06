@@ -79,12 +79,8 @@ public final class PlaybackCommands {
         if (screen == null || !support.requireManage(source, screen)) {
             return 0;
         }
-        // greedyString 会吞掉整行：第一个空白前是 URL，后面是可选 Referer。
-        String raw = StringArgumentType.getString(context, "url").trim();
-        String[] parts = raw.split("\\s+", 2);
-        String rawUrl = parts.length == 0 ? "" : parts[0];
-        String referer = parts.length > 1 ? parts[1].trim() : null;
-        Urls.Checked checked = Urls.validate(rawUrl, referer, support.settings().media());
+        String[] parsed = splitLink(StringArgumentType.getString(context, "url"));
+        Urls.Checked checked = Urls.validate(parsed[0], parsed[1], support.settings().media());
         if (!checked.ok()) {
             support.error(source, checked.message());
             return 0;
@@ -104,11 +100,8 @@ public final class PlaybackCommands {
         if (screen == null || !support.requireManage(source, screen)) {
             return 0;
         }
-        String raw = StringArgumentType.getString(context, "url").trim();
-        String[] parts = raw.split("\\s+", 2);
-        String rawUrl = parts.length == 0 ? "" : parts[0];
-        String referer = parts.length > 1 ? parts[1].trim() : null;
-        Urls.Checked checked = Urls.validate(rawUrl, referer, support.settings().media());
+        String[] parsed = splitLink(StringArgumentType.getString(context, "url"));
+        Urls.Checked checked = Urls.validate(parsed[0], parsed[1], support.settings().media());
         if (!checked.ok()) {
             support.error(source, checked.message());
             return 0;
@@ -230,6 +223,29 @@ public final class PlaybackCommands {
         long position = support.playback().state(screen.id()).positionMillis();
         support.reply(source, "<green>已跳转到 " + Text.duration(position));
         return 1;
+    }
+
+    /**
+     * 拆分「地址 + 可选 Referer」。
+     *
+     * <p>第一段是地址时按原有格式解析，第二段只有本身也是地址才当作 Referer；
+     * 第一段不是地址时按分享文案处理，从整段文字里提取地址。</p>
+     */
+    private static String[] splitLink(String raw) {
+        String text = raw == null ? "" : raw.trim();
+        String[] parts = text.split("\\s+", 2);
+        String first = parts.length == 0 ? "" : parts[0];
+        if (first.startsWith("http://") || first.startsWith("https://")) {
+            String referer = null;
+            if (parts.length > 1) {
+                String tail = parts[1].trim();
+                if (tail.startsWith("http://") || tail.startsWith("https://")) {
+                    referer = tail;
+                }
+            }
+            return new String[]{first, referer};
+        }
+        return new String[]{Urls.extractUrl(text), null};
     }
 
     /** 便于外部复用的 URL 上限提示。 */

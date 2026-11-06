@@ -30,9 +30,9 @@ public final class ClientConfig {
     public boolean allowPrivateHosts = false;
     public boolean debug = false;
     public String ffmpegPath = "";
-    public String ytDlpPath = "";
     public String cookiesFile = "";
     public String proxy = "";
+    public String douyinApi = "";
     public int qualityHeight = 1080;
 
     public static ClientConfig load() {
@@ -69,14 +69,14 @@ public final class ClientConfig {
         if (ffmpegPath == null) {
             ffmpegPath = "";
         }
-        if (ytDlpPath == null) {
-            ytDlpPath = "";
-        }
         if (cookiesFile == null) {
             cookiesFile = "";
         }
         if (proxy == null) {
             proxy = "";
+        }
+        if (douyinApi == null) {
+            douyinApi = "";
         }
     }
 

@@ -2,23 +2,25 @@
 
 > 作者：JunXieX　|　MikuMC系列插件交流群：1105054380　|　非开源项目，请勿二次分发
 
-MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏内直接播放网络视频。服务端只同步屏幕位置、尺寸和播放时间线，**不代理、不缓存、不解码任何视频数据**；视频由每位玩家的客户端自行连接视频源解码，因此服务器带宽与 CPU 开销几乎与视频码率无关。
+MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏内直接播放网络视频。服务端只同步屏幕位置、尺寸和播放时间线，**不代理、不缓存、不解码任何视频数据**；视频由每位玩家的客户端自行连接视频源解码，因此服务器带宽与 CPU 开销几乎与视频码率、观看人数无关。
+
+在线视频平台只支持 **B 站** 与 **抖音**：B 站视频/番剧/直播与抖音直播由客户端原生解析，抖音视频走可配置解析接口。也支持任意 FFmpeg 能直接打开的 MP4 / HLS / FLV 直链。
 
 适用场景：影院、家庭电视、展厅、活动直播、公告屏。
 
 ## 功能特性
 
-- 每位玩家创建并管理自己的屏幕：位置、尺寸、朝向、音量、公开/私有。
-- 网页视频：直接粘贴 B 站（视频/番剧/直播）、YouTube、Twitch、Vimeo 等站点链接，客户端优先用 B 站原生 API（WBI 签名）解析成 DASH 音视频流，失败再回退 yt-dlp；服务端只转发 URL，不解析、不代理。
-- 播放控制：播放、暂停、继续、停止、跳转、音量；支持播放队列，播完自动切下一项。
-- 同时支持直链 MP4、HLS（m3u8）、FLV 等 FFmpeg 可解码地址。
-- 服务端权威时间线：所有观众按同一时间点播放，播放中每 5 秒自动纠偏，晚进服也能追上进度。
-- 客户端本地解码：基于 FFmpeg 子进程，不占用服务端资源。
-- 客户端解码预算：同时解码的屏幕数量可配，按距离与可见性调度，看不见的屏幕自动停止解码。
-- Dialog 图形菜单：屏幕列表、控制页、链接/尺寸/音量输入、删除二次确认。
-- Paper 与 Folia 共用同一个 jar，全部走区域化调度器。
-- 权限节点、单玩家屏幕上限、全服上限、URL 私网拦截、请求头白名单、命令冷却。
-- 数据持久化：JSON 原子写 + 合并写盘，坏文件自动备份，不阻塞开服。
+- **每名玩家管理自己的屏幕**：位置、尺寸、朝向、音量、公开/私有；完整图形菜单与命令两套入口。
+- **B 站原生解析**：视频、番剧、直播、分 P、`av`/`BV`/`ep`/`ss`/短链，WBI 签名直连官方 API，输出 DASH 音视频双流，支持 360p～8K 画质档位。
+- **B 站搜索**：聊天栏输入关键词，结果可点击直接播放到指定屏幕。
+- **抖音支持**：直播间原生抓取 HLS/FLV；视频走可配置解析接口，接口可换成自建服务或关闭。
+- **服务端权威时间线**：所有人按同一时间点播放，每 5 秒纠偏，晚进服自动追上进度。
+- **播放队列**：每块屏幕独立队列，播完自动切下一项，**重启后队列仍在**。
+- **客户端本地解码**：内置 FFmpeg 9.0（Windows/Linux x64），子进程解码，不占服务端资源。
+- **解码预算**：同时解码屏幕数、分辨率、帧率、码率上限均可配；看不见的屏幕自动停解码。
+- **Paper 与 Folia 共用一个 jar**：全部走区域化调度器，没有 `BukkitScheduler`。
+- **权限与限额**：权限节点、单玩家/全服屏幕上限、URL 私网拦截、请求头白名单、命令冷却。
+- **数据安全**：JSON 原子写 + 合并写盘，坏文件自动备份，不阻塞开服。
 
 ## 环境要求
 
@@ -34,7 +36,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.4.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.5.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -44,8 +46,8 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.4.jar` 放进 `mods/`。
-3. **FFmpeg 与 yt-dlp 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/` 与 `.minecraft/mikuvideo/ytdlp/bundled-1/`，不需要手动安装。
+2. 把 `MikuVideo-Client-1.0.5.jar` 放进 `mods/`。
+3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
 4. 进服后默认按 `V` 与看向的屏幕交互；按键可在“按键设置 → MikuVideo”里修改。
@@ -55,9 +57,10 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ## 快速上手
 
 1. 看向一面墙，执行 `/mv create 客厅 4 2.25`，屏幕会贴在准星指向的方块面上。
-2. 执行 `/mv play 客厅 https://example.com/video.m3u8`，3 秒缓冲后开始播放。
-3. 执行 `/mv menu` 打开图形菜单，或按 `V` 对着屏幕打开控制页。
-4. 用 `/mv list` 查看自己的屏幕，`/mv info 客厅` 查看详情。
+2. 执行 `/mv play 客厅 https://www.bilibili.com/video/BV1GJ411x7h7`，3 秒缓冲后开始播放。
+3. 抖音分享链接可以整段粘贴，前后的“复制打开抖音”等文字会被自动去掉。
+4. 执行 `/mv menu` 打开图形菜单，或按 `V` 对着屏幕打开控制页。
+5. 用 `/mv list` 查看自己的屏幕，`/mv info 客厅` 查看详情。
 
 ## 配置说明
 
@@ -103,11 +106,11 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mv volume <屏幕> <0-100>` | 设置音量 |
 | `/mv play <屏幕> <链接> [Referer]` | 播放链接 |
 | `/mv pause <屏幕>` / `resume` / `stop` | 暂停 / 继续 / 停止 |
-| @BT@/mv seek <屏幕> <秒>@BT@ | 跳转 |
-| @BT@/mv queue add <屏幕> <链接>@BT@ | 追加播放队列（最多 64 项） |
-| @BT@/mv queue list <屏幕>@BT@ | 查看队列 |
-| @BT@/mv queue next <屏幕>@BT@ | 立即切到下一项 |
-| @BT@/mv queue clear <屏幕>@BT@ | 清空队列 |
+| `/mv seek <屏幕> <秒>` | 跳转 |
+| `/mv queue add <屏幕> <链接>` | 追加播放队列（最多 64 项，重启保留） |
+| `/mv queue list <屏幕>` | 查看队列 |
+| `/mv queue next <屏幕>` | 立即切到下一项 |
+| `/mv queue clear <屏幕>` | 清空队列 |
 | `/mv admin reload` | 重载配置 |
 | `/mv admin list [页码]` | 全服屏幕列表 |
 | `/mv admin remove <屏幕>` | 强制删除屏幕 |
@@ -125,11 +128,11 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mikuvideo-client streams <0-16>` | 同时解码的屏幕数量上限 |
 | `/mikuvideo-client ffmpeg <路径>` | 指定 FFmpeg 可执行文件 |
 | `/mikuvideo-client download` | 自动下载 FFmpeg |
-| `/mikuvideo-client cookies <文件>` | 设置 B 站等站点的 Netscape cookies.txt |
+| `/mikuvideo-client cookies <文件>` | 设置 B 站 Netscape cookies.txt（1080p+ / 大会员） |
 | `/mikuvideo-client quality <360\|480\|720\|1080\|best>` | 网页视频解析高度上限 |
-| `/mikuvideo-client ytdlp <路径>` | 指定 yt-dlp 可执行文件 |
-| @BT@/mikuvideo-client resolver@BT@ | 查看 yt-dlp 状态 |
-| @BT@/mikuvideo-client search <屏幕> <关键词>@BT@ | 搜索 B 站视频，点击结果直接播放到指定屏幕 |
+| `/mikuvideo-client search <屏幕> <关键词>` | 搜索 B 站视频，点击结果直接播放到指定屏幕 |
+| `/mikuvideo-client douyinapi <接口\|default\|off>` | 设置抖音视频解析接口，`off` 关闭（直播不受影响） |
+| `/mikuvideo-client resolver` | 查看当前解析链路状态 |
 | `/mikuvideo-client reload` | 重载客户端配置 |
 
 ## 权限节点
@@ -145,9 +148,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ## 视频源说明
 
-### 网页视频（B 站等）
-
-直接粘贴页面链接即可，例如：
+### B 站
 
 ```text
 /mv play 客厅 https://www.bilibili.com/video/BV1GJ411x7h7
@@ -155,11 +156,26 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 /mv play 客厅 https://live.bilibili.com/12345
 ```
 
-- 解析在**客户端**完成：B 站链接走原生 web API（WBI 签名，支持视频/番剧/直播、分 P、画质档位），解析成 DASH 音/视频地址；原生失败时回退内置 yt-dlp。服务端只收到原始 URL，不访问站点。
-- B 站 1080p 及以上、付费/大会员内容需要登录 Cookie：用浏览器扩展导出 Netscape 格式的 `cookies.txt`，然后执行 `/mikuvideo-client cookies <文件路径>`。
-- 画质上限：`/mikuvideo-client quality <360|480|720|1080|best>`；默认 1080，实际可用档位由源站与 Cookie 权限决定。
-- B 站原生解析覆盖视频、番剧、直播与分 P；YouTube、Twitch、Vimeo 等由内置 yt-dlp 处理，可能受地区、登录或 JS 运行时限制。
-- 换解析器：`/mikuvideo-client ytdlp <路径>`；查看状态：`/mikuvideo-client resolver`。
+- 客户端直接调用 B 站 web API（WBI 签名），不经过服务端、不依赖第三方。
+- 覆盖视频、番剧、直播、分 P、`av`/`BV`/`ep`/`ss` 与 `b23.tv` 短链。
+- 输出 DASH 音视频双流交给 FFmpeg；老视频或版权限制时回退 `durl` 单流。
+- 1080p 及以上、付费/大会员内容需要登录 Cookie：用浏览器扩展导出 Netscape 格式的 `cookies.txt`，执行 `/mikuvideo-client cookies <文件路径>`。
+- 画质上限：`/mikuvideo-client quality <360|480|720|1080|best>`，默认 1080。
+
+### 抖音
+
+```text
+/mv play 客厅 https://www.douyin.com/video/7xxxxxxxxxxxxxxxxxx
+/mv play 客厅 https://v.douyin.com/xxxxxxx/
+/mv play 客厅 https://live.douyin.com/123456789
+```
+
+- **直播间**：客户端直接抓取直播页，解析 HLS（优先）或 FLV 拉流地址。
+- **视频**：抖音网页详情接口自 2026 年起要求 secsdk 页面签名，纯 HTTP 无法复现；因此视频走可配置解析接口。
+  - 默认接口：`https://api.xingzhige.com/API/douyin/?url={url}`。
+  - 换成自建服务：`/mikuvideo-client douyinapi https://your-api.example.com/parse?url={url}`，`{url}` 会被替换为编码后的视频地址；接口返回 JSON 即可，视频地址从 `data.item.url`、`data.url`、`data.video.url` 中取第一个可用值。
+  - 关闭：`/mikuvideo-client douyinapi off`，此时只支持抖音直播。
+- 分享文案可以整段粘贴，服务端会自动提取其中的链接。
 
 ### 直链视频
 
@@ -169,6 +185,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 安全
 
 - 默认拒绝 `localhost`、`127.0.0.0/8`、`10/8`、`172.16/12`、`192.168/16`、`169.254/16`、`::1`、`fc00::/7`、`fe80::/10`、`.local`，服务端与客户端各校验一次，防止把观众客户端当成内网跳板。
+- 服务端只做字面量校验，不对目标域名做 DNS 解析。
 
 ## 常见问题
 
@@ -191,7 +208,7 @@ HLS 的跳转只能落在分片边界（常见 2~6 秒一片），这是协议�
 Windows x64 / Linux x64 不需要，模组已内置 FFmpeg 9.0，首次播放自动解压。macOS、Linux ARM 等未内置平台仍可用系统 FFmpeg 或 `/mikuvideo-client ffmpeg <路径>` 指定。
 
 **升级会丢数据吗？**
-不会。替换 jar 重启即可，`config.yml` 与 `screens.json` 保持原样；格式版本变化时会按兼容方式读取。
+不会。替换 jar 重启即可，`config.yml` 与 `screens.json` 保持原样；播放队列也保存在 `screens.json` 里，重启后继续。
 
 ---
 

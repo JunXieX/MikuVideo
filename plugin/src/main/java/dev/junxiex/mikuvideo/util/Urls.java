@@ -98,6 +98,56 @@ public final class Urls {
         return Checked.pass(url, headers);
     }
 
+    /**
+     * 从分享文案里取出第一个 HTTP(S) 地址。
+     *
+     * <p>抖音的分享按钮会复制「8.88 复制打开抖音…」这类整段文字，玩家往往整段粘贴；
+     * 服务端先取出地址再做校验，避免因为前后缀空白被直接拒绝。</p>
+     *
+     * @param raw 原始输入
+     * @return 提取到的地址；没有地址时返回去除首尾空白后的原文
+     */
+    public static String extractUrl(String raw) {
+        if (raw == null) {
+            return "";
+        }
+        String text = raw.trim();
+        int cursor = 0;
+        while (cursor < text.length()) {
+            int http = text.indexOf("http://", cursor);
+            int https = text.indexOf("https://", cursor);
+            int start;
+            if (http < 0) {
+                start = https;
+            } else if (https < 0) {
+                start = http;
+            } else {
+                start = Math.min(http, https);
+            }
+            if (start < 0) {
+                break;
+            }
+            int end = start;
+            while (end < text.length() && !Character.isWhitespace(text.charAt(end))) {
+                end++;
+            }
+            while (end > start && isTrailingPunctuation(text.charAt(end - 1))) {
+                end--;
+            }
+            if (end - start > "https://".length()) {
+                return text.substring(start, end);
+            }
+            cursor = Math.max(end, start + 1);
+        }
+        return text;
+    }
+
+    private static boolean isTrailingPunctuation(char c) {
+        return c == ',' || c == '.' || c == ';' || c == ')' || c == ']' || c == '>'
+                || c == '，' || c == '。' || c == '、' || c == '；' || c == '）'
+                || c == '】' || c == '》' || c == '"' || c == '\'';
+    }
+
     /** 去掉 IPv6 字面量外层的中括号并转小写。 */
     public static String normalizeHost(String host) {
         String value = host.trim().toLowerCase(Locale.ROOT);

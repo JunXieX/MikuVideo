@@ -46,7 +46,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
     public static final int DATA_VERSION = 1;
 
     /** 载入结果。 */
-    public record Loaded(Screen screen, Playback playback) {
+    public record Loaded(Screen screen, Playback playback, List<PlaybackService.QueuedMedia> queue) {
     }
 
     private static final Gson GSON = new GsonBuilder().setPrettyPrinting().disableHtmlEscaping().create();
@@ -258,7 +258,51 @@ public final class ScreenStorage implements ScreenManager.Listener {
         object.addProperty("public", screen.publicScreen());
         object.addProperty("createdAt", screen.createdAt());
         object.add("playback", writePlayback(state));
+        object.add("queue", writeQueue(playback.queueList(screen.id())));
         return object;
+    }
+
+    private JsonArray writeQueue(List<PlaybackService.QueuedMedia> queue) {
+        JsonArray array = new JsonArray();
+        for (PlaybackService.QueuedMedia item : queue) {
+            JsonObject object = new JsonObject();
+            object.addProperty("url", item.url());
+            JsonObject headers = new JsonObject();
+            for (Map.Entry<String, String> entry : item.headers().entrySet()) {
+                headers.addProperty(entry.getKey(), entry.getValue());
+            }
+            object.add("headers", headers);
+            array.add(object);
+        }
+        return array;
+    }
+
+    private List<PlaybackService.QueuedMedia> readQueue(JsonElement element) {
+        if (element == null || !element.isJsonArray()) {
+            return List.of();
+        }
+        List<PlaybackService.QueuedMedia> queue = new ArrayList<>();
+        for (JsonElement item : element.getAsJsonArray()) {
+            if (!item.isJsonObject() || queue.size() >= 64) {
+                continue;
+            }
+            JsonObject object = item.getAsJsonObject();
+            String url = optString(object, "url", "");
+            if (url.isBlank()) {
+                continue;
+            }
+            Map<String, String> headers = new LinkedHashMap<>();
+            JsonElement headerElement = object.get("headers");
+            if (headerElement != null && headerElement.isJsonObject()) {
+                for (Map.Entry<String, JsonElement> entry : headerElement.getAsJsonObject().entrySet()) {
+                    if (entry.getValue() != null && entry.getValue().isJsonPrimitive()) {
+                        headers.put(entry.getKey(), entry.getValue().getAsString());
+                    }
+                }
+            }
+            queue.add(new PlaybackService.QueuedMedia(url, headers));
+        }
+        return List.copyOf(queue);
     }
 
     private JsonObject writePlayback(Playback state) {
@@ -319,7 +363,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
                 optBoolean(object, "public", true),
                 optLong(object, "createdAt", System.currentTimeMillis()));
         Playback state = readPlayback(object.getAsJsonObject("playback"), screen.volume());
-        return new Loaded(screen, state);
+        return new Loaded(screen, state, readQueue(object.get("queue")));
     }
 
     private Playback readPlayback(JsonObject object, int fallbackVolume) {

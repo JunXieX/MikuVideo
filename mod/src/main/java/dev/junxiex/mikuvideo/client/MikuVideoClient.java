@@ -42,7 +42,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
-        media().resolver().setYtDlpPath(config.ytDlpPath);
+        media().resolver().setDouyinApi(config.douyinApi);
         startFfmpegInit();
 
         ScreenRenderer.register();
@@ -94,7 +94,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
-        media().resolver().setYtDlpPath(config.ytDlpPath);
+        media().resolver().setDouyinApi(config.douyinApi);
     }
 
     public static MediaManager media() {

@@ -1,33 +1,38 @@
 package dev.junxiex.mikuvideo.client.media;
 
+import dev.junxiex.mikuvideo.client.media.douyin.DouyinResolver;
 import dev.junxiex.mikuvideo.client.media.resolve.ResolvedMedia;
 
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-/** 页面地址解析服务：已知站点走 yt-dlp，直链直接返回。 */
+/**
+ * 页面地址解析服务：B 站与抖音走各自的原生/接口解析，带媒体扩展名的地址直接播放。
+ *
+ * <p>解析全部在客户端完成，服务端只转发原始 URL。解析结果缓存 5 分钟，
+ * 同一屏幕重复进入视野不会重复打接口。</p>
+ *
+ * @author JunXieX
+ */
 public final class MediaResolverService {
     private static final long CACHE_MILLIS = 5 * 60 * 1000L;
     private static final Set<String> PAGE_HOSTS = Set.of(
-            "bilibili.com", "b23.tv", "youtube.com", "youtu.be", "twitch.tv", "vimeo.com",
-            "douyin.com", "kuaishou.com", "ixigua.com", "acfun.cn", "weibo.com", "xiaohongshu.com",
-            "nicovideo.jp", "dailymotion.com", "facebook.com", "twitter.com", "x.com");
+            "bilibili.com", "b23.tv", "douyin.com", "iesdouyin.com");
 
-    private final YtDlpLocator locator;
-    private final YtDlpResolver resolver;
     private final BilibiliResolver bilibili = new BilibiliResolver();
+    private final DouyinResolver douyin = new DouyinResolver();
     private final ExecutorService executor;
     private final Map<String, Cached> cache = new ConcurrentHashMap<>();
 
     public MediaResolverService(Path gameDir) {
-        this.locator = new YtDlpLocator(gameDir);
-        this.resolver = new YtDlpResolver(locator);
         this.executor = Executors.newFixedThreadPool(2, runnable -> {
             Thread thread = new Thread(runnable, "mikuvideo-resolver");
             thread.setDaemon(true);
@@ -35,19 +40,25 @@ public final class MediaResolverService {
         });
     }
 
-    public void setYtDlpPath(String path) {
-        locator.setPath(path);
+    /** 空值使用内置默认接口，{@code off} 表示关闭抖音视频解析。 */
+    public void setDouyinApi(String template) {
+        String value = template == null || template.isBlank() ? DouyinResolver.DEFAULT_API : template.trim();
+        if (value.equalsIgnoreCase("off")) {
+            value = "";
+        }
+        douyin.setApiTemplate(value);
     }
 
-    public boolean isYtDlpAvailable() {
-        return resolver.available();
+    public String douyinApi() {
+        return douyin.apiTemplate();
     }
 
     public String statusText() {
-        return resolver.statusText();
+        return "B 站：原生（视频/番剧/直播）"
+                + "；抖音：直播原生，视频 " + (douyin.apiTemplate().isBlank() ? "已关闭" : "解析接口");
     }
 
-    /** 是否是已知网页视频站点。 */
+    /** 是否是已支持的网页视频站点。 */
     public boolean isKnownPage(String url) {
         String host = hostOf(url);
         if (host == null) {
@@ -83,7 +94,7 @@ public final class MediaResolverService {
             try {
                 return bilibili.search(keyword, 1, cookies, proxy);
             } catch (Exception error) {
-                throw new java.util.concurrent.CompletionException(error);
+                throw new CompletionException(error);
             }
         }, executor);
     }
@@ -92,7 +103,8 @@ public final class MediaResolverService {
         if (!looksLikePage(url)) {
             return CompletableFuture.completedFuture(direct(url));
         }
-        String key = url + "|" + maxHeight + "|" + (cookies == null ? "" : cookies.toAbsolutePath()) + "|" + proxy;
+        String key = url + "|" + maxHeight + "|" + (cookies == null ? "" : cookies.toAbsolutePath()) + "|" + proxy
+                + "|" + douyin.apiTemplate();
         Cached cached = cache.get(key);
         long now = System.currentTimeMillis();
         if (cached != null && cached.expiresAt > now) {
@@ -100,6 +112,15 @@ public final class MediaResolverService {
         }
         return CompletableFuture.supplyAsync(() -> {
             Exception nativeFailure = null;
+            if (douyin.supports(url)) {
+                try {
+                    ResolvedMedia media = douyin.resolve(url, cookies, maxHeight, proxy);
+                    cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
+                    return media;
+                } catch (Exception error) {
+                    nativeFailure = error;
+                }
+            }
             if (bilibili.supports(url)) {
                 try {
                     ResolvedMedia media = bilibili.resolve(url, cookies, maxHeight, proxy);
@@ -109,20 +130,11 @@ public final class MediaResolverService {
                     nativeFailure = error;
                 }
             }
-            try {
-                ResolvedMedia media = resolver.resolve(url, cookies, maxHeight, proxy);
-                cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
-                return media;
-            } catch (Exception error) {
-                if (nativeFailure != null) {
-                    error.addSuppressed(nativeFailure);
-                }
-                if (!isKnownPage(url)) {
-                    // 未知站点解析失败时仍按直链尝试，避免误伤普通流地址。
-                    return direct(url);
-                }
-                throw new java.util.concurrent.CompletionException(error);
+            if (isKnownPage(url)) {
+                throw new CompletionException(nativeFailure != null ? nativeFailure
+                        : new IOException("暂不支持该站点，仅支持 B 站与抖音"));
             }
+            return direct(url);
         }, executor);
     }
 

@@ -173,15 +173,21 @@ public final class MikuVideoClientCommands {
                                         info(ctx.getSource(), "网页视频解析高度上限已设为 " + height + "p");
                                         return 1;
                                     })))
-                    .then(ClientCommands.literal("ytdlp")
-                            .then(ClientCommands.argument("path", StringArgumentType.greedyString())
+                    .then(ClientCommands.literal("douyinapi")
+                            .then(ClientCommands.argument("value", StringArgumentType.greedyString())
                                     .executes(ctx -> {
-                                        String path = StringArgumentType.getString(ctx, "path").trim();
+                                        String value = StringArgumentType.getString(ctx, "value").trim();
                                         ClientConfig config = MikuVideoClient.config();
-                                        config.ytDlpPath = path;
+                                        config.douyinApi = value.equalsIgnoreCase("default") ? "" : value;
                                         config.save();
-                                        MikuVideoClient.media().resolver().setYtDlpPath(path);
-                                        info(ctx.getSource(), "yt-dlp 路径已设为: " + path);
+                                        MikuVideoClient.media().resolver().setDouyinApi(config.douyinApi);
+                                        if (value.equalsIgnoreCase("off")) {
+                                            info(ctx.getSource(), "已关闭抖音视频解析（直播不受影响）");
+                                        } else if (value.equalsIgnoreCase("default")) {
+                                            info(ctx.getSource(), "抖音视频解析已恢复默认接口");
+                                        } else {
+                                            info(ctx.getSource(), "抖音视频解析接口已设为: " + value);
+                                        }
                                         return 1;
                                     })))
                     .then(ClientCommands.literal("resolver").executes(ctx -> {

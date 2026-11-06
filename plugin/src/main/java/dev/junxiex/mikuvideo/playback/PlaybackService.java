@@ -348,6 +348,28 @@ public final class PlaybackService implements ScreenManager.Listener {
         return true;
     }
 
+    /** 载入阶段恢复队列（最多 64 项）。 */
+    public int restoreQueue(String screenId, List<QueuedMedia> items) {
+        if (screenId == null || items == null || items.isEmpty()) {
+            return 0;
+        }
+        Deque<QueuedMedia> queue = queues.computeIfAbsent(screenId, key -> new ArrayDeque<>());
+        int added = 0;
+        synchronized (queue) {
+            for (QueuedMedia item : items) {
+                if (item == null || item.url().isBlank()) {
+                    continue;
+                }
+                if (queue.size() >= 64) {
+                    break;
+                }
+                queue.addLast(item);
+                added++;
+            }
+        }
+        return added;
+    }
+
     /** 屏幕删除时清理队列。 */
     public void forgetQueue(String screenId) {
         if (screenId != null) {

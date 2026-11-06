@@ -146,6 +146,7 @@ public final class MikuVideoPlugin extends JavaPlugin {
             Screen screen = entry.screen();
             screenManager.importScreen(screen);
             playbackService.importState(screen.id(), entry.playback());
+            playbackService.restoreQueue(screen.id(), entry.queue());
         }
 
         clientRegistry = new ClientRegistry();
