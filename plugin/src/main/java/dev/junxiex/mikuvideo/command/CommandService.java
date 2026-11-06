@@ -159,7 +159,7 @@ public final class CommandService {
         support.reply(source, "<gray>可见性：<white>" + (screen.publicScreen() ? "公开" : "私有")
                 + "</white>　音量：<white>" + screen.volume() + "</white>");
         support.reply(source, "<gray>链接：<white>" + (state.isStopped() ? "未设置" : state.url()) + "</white>");
-        support.reply(source, "<gray>状态：<white>" + (state.paused() ? "暂停" : "播放中") + "</white>　进度：<white>"
+        support.reply(source, "<gray>状态：<white>" + (state.isStopped() ? "未播放" : (state.paused() ? "暂停" : "播放中")) + "</white>　进度：<white>"
                 + Text.duration(position) + " / "
                 + (state.durationMillis() > 0L ? Text.duration(state.durationMillis()) : "未知") + "</white>");
         return 1;

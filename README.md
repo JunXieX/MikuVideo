@@ -155,6 +155,12 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 **Folia 能用吗？**
 可以。插件声明了 `folia-supported: true`，所有任务走全局/区域/实体/异步调度器，没有使用 `BukkitScheduler`。
 
+**HLS 直播/点播跳转不准？**
+HLS 的跳转只能落在分片边界（常见 2~6 秒一片），这是协议本身的限制；MP4 直链的跳转是精确的。需要精确跳转时优先使用 MP4 源。
+
+**FFmpeg 版本有要求吗？**
+6.0 及以上即可，推荐 7.x / 9.x。Windows 可用 `/mikuvideo-client download` 自动获取，Linux 可用系统包管理器安装。
+
 **升级会丢数据吗？**
 不会。替换 jar 重启即可，`config.yml` 与 `screens.json` 保持原样；格式版本变化时会按兼容方式读取。
 

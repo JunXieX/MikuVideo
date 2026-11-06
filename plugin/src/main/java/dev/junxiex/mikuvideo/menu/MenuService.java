@@ -165,7 +165,7 @@ public final class MenuService {
                 DialogBody.plainMessage(Component.text("位置：" + screen.world() + "　"
                         + Text.number(screen.cx()) + ", " + Text.number(screen.cy()) + ", " + Text.number(screen.cz()))),
                 DialogBody.plainMessage(Component.text("链接：" + (state.isStopped() ? "未设置" : url))),
-                DialogBody.plainMessage(Component.text("状态：" + (state.paused() ? "暂停" : "播放中")
+                DialogBody.plainMessage(Component.text("状态：" + (state.isStopped() ? "未播放" : (state.paused() ? "暂停" : "播放中"))
                         + "　进度：" + Text.duration(position) + " / "
                         + (state.durationMillis() > 0L ? Text.duration(state.durationMillis()) : "未知"))),
                 DialogBody.plainMessage(Component.text("尺寸：" + screen.width() + " x " + screen.height()
@@ -193,7 +193,7 @@ public final class MenuService {
                         .step(1.0F)
                         .build());
         List<ActionButton> buttons = new ArrayList<>();
-        buttons.add(button(Component.text(state.paused() ? "继续播放" : "暂停"),
+        buttons.add(button(Component.text(state.isStopped() ? "播放" : (state.paused() ? "继续播放" : "暂停")),
                 Component.text("切换暂停状态"),
                 click((response, clicker) -> togglePlayback(clicker, screenId, response))));
         buttons.add(button(Component.text("停止"), Component.text("清空链接与进度"),
