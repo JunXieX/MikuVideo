@@ -116,19 +116,25 @@ public record Settings(Limits limits, SyncSettings sync, Media media, StorageSet
     public record Messages(String prefix, String clientDownloadUrl, String noClient, String noPermission,
                            String screenNotFound) {
 
+        // 常量必须先于 DEFAULTS 声明：DEFAULTS 的构造会读这些常量。
+        private static final String DEFAULT_PREFIX = "<gradient:#66ccff:#ff99ff>[MikuVideo]</gradient> ";
+        private static final String DEFAULT_DOWNLOAD_URL = "https://github.com/JunXieX/MikuVideo/releases";
+        private static final String DEFAULT_NO_CLIENT =
+                "<red>未检测到客户端模组，请安装 MikuVideo 客户端模组后重新进入服务器。";
+        private static final String DEFAULT_NO_PERMISSION = "<red>你没有权限执行该操作。";
+        private static final String DEFAULT_SCREEN_NOT_FOUND = "<red>找不到该屏幕，请用 /mv list 查看可用屏幕。";
+
         public static final Messages DEFAULTS = new Messages(
-                "<gradient:#66ccff:#ff99ff>[MikuVideo]</gradient> ",
-                "https://example.com/mikuvideo",
-                "<red>未检测到客户端模组，请安装 MikuVideo 客户端模组后重新进入服务器。",
-                "<red>你没有权限执行该操作。",
-                "<red>找不到该屏幕，请用 /mv list 查看可用屏幕。");
+                DEFAULT_PREFIX, DEFAULT_DOWNLOAD_URL, DEFAULT_NO_CLIENT,
+                DEFAULT_NO_PERMISSION, DEFAULT_SCREEN_NOT_FOUND);
 
         public Messages {
-            prefix = blankTo(prefix, DEFAULTS.prefix);
-            clientDownloadUrl = trimTo(clientDownloadUrl, Protocol.MAX_URL, DEFAULTS.clientDownloadUrl);
-            noClient = blankTo(noClient, DEFAULTS.noClient);
-            noPermission = blankTo(noPermission, DEFAULTS.noPermission);
-            screenNotFound = blankTo(screenNotFound, DEFAULTS.screenNotFound);
+            // 不能用 DEFAULTS：类初始化时 DEFAULTS 本身还在构造中，引用会得到 null。
+            prefix = blankTo(prefix, DEFAULT_PREFIX);
+            clientDownloadUrl = trimTo(clientDownloadUrl, Protocol.MAX_URL, DEFAULT_DOWNLOAD_URL);
+            noClient = blankTo(noClient, DEFAULT_NO_CLIENT);
+            noPermission = blankTo(noPermission, DEFAULT_NO_PERMISSION);
+            screenNotFound = blankTo(screenNotFound, DEFAULT_SCREEN_NOT_FOUND);
         }
     }
 

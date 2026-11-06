@@ -41,7 +41,7 @@ media:
     - https
   # 主机黑名单，支持精确匹配与 *.example.com 通配
   blocked-hosts: []
-  # 链接最大长度（字符），上限受协议约束为 4096
+  # 链接最大长度（UTF-8 字节），上限受协议约束为 4096
   max-url-length: 1024
   # 单次播放最多携带多少个请求头，上限受协议约束为 16
   max-headers: 8
