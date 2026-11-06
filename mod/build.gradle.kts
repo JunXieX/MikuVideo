@@ -62,12 +62,12 @@ val prepareBundledFfmpeg = tasks.register("prepareBundledFfmpeg") {
         for (platform in bundledFfmpegPlatforms) {
             val url = ffmpegSources[platform]
             if (url == null) {
-                logger.warn("没有为平台 {} 配置 FFmpeg 下载地址，跳过", platform)
+                println("没有为平台 " + platform + " 配置 FFmpeg 下载地址，跳过")
                 continue
             }
             val archive = File(ffmpegCacheDir, url.substringAfterLast('/'))
             if (!archive.isFile || archive.length() == 0L) {
-                logger.lifecycle("下载 FFmpeg {}: {}", platform, url)
+                println("下载 FFmpeg " + platform + ": " + url)
                 archive.parentFile.mkdirs()
                 URI(url).toURL().openStream().use { input ->
                     archive.outputStream().use { output -> input.copyTo(output) }
@@ -81,13 +81,13 @@ val prepareBundledFfmpeg = tasks.register("prepareBundledFfmpeg") {
             val work = File(ffmpegCacheDir, "work-$platform")
             work.deleteRecursively()
             work.mkdirs()
-            val binary = extractBinary(archive, work)
+            val binary = FfmpegBundler.extractBinary(archive, work)
             ZipOutputStream(target.outputStream().buffered()).use { zip ->
                 zip.putNextEntry(ZipEntry(binary.name))
                 binary.inputStream().use { input -> input.copyTo(zip) }
                 zip.closeEntry()
             }
-            logger.lifecycle("内置 FFmpeg {}: {} MB", platform, target.length() / 1024 / 1024)
+            println("内置 FFmpeg " + platform + ": " + (target.length() / 1024 / 1024) + " MB")
         }
     }
 }
@@ -96,7 +96,9 @@ sourceSets.main {
     resources.srcDir(prepareBundledFfmpeg)
 }
 
-fun extractBinary(archive: File, work: File): File {
+object FfmpegBundler {
+    @JvmStatic
+    fun extractBinary(archive: File, work: File): File {
     return when {
         archive.name.endsWith(".zip", ignoreCase = true) -> {
             ZipFile(archive).use { zip ->
@@ -129,6 +131,7 @@ fun extractBinary(archive: File, work: File): File {
         }
 
         else -> throw GradleException("不支持的 FFmpeg 压缩格式: ${archive.name}")
+    }
     }
 }
 
