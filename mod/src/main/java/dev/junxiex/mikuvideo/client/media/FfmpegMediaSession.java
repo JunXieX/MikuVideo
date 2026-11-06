@@ -581,8 +581,6 @@ public final class FfmpegMediaSession implements MediaSession {
             return;
         }
         this.run = null;
-        this.paused = true;
-        this.ended = true;
         int exit = waitExit(current.videoProcess, 600L);
         String tail = current.videoStderr.tail(STDERR_LINES);
         if (tail.isEmpty() && current.failure != null) {
@@ -596,6 +594,9 @@ public final class FfmpegMediaSession implements MediaSession {
             applyState(MediaState.ERROR, lastError);
             return;
         }
+        // 只有正常 EOF 才算“播完”；异常退出留给上层重试，不能永久锁死这块屏幕。
+        this.paused = true;
+        this.ended = true;
         applyState(MediaState.PAUSED, "播放结束");
     }
 
