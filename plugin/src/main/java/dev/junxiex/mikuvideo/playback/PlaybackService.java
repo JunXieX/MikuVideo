@@ -6,6 +6,10 @@ import dev.junxiex.mikuvideo.screen.Screen;
 import dev.junxiex.mikuvideo.screen.ScreenManager;
 import dev.junxiex.mikuvideo.util.Tasks;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Deque;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
@@ -60,6 +64,7 @@ public final class PlaybackService implements ScreenManager.Listener {
     private final Tasks tasks;
     private final Map<String, Playback> states = new ConcurrentHashMap<>();
     private final Map<String, Long> tokens = new ConcurrentHashMap<>();
+    private final Map<String, Deque<QueuedMedia>> queues = new ConcurrentHashMap<>();
     private final AtomicLong sequence = new AtomicLong();
     private volatile Broadcaster broadcaster = Broadcaster.NONE;
     private volatile boolean closed;
@@ -245,11 +250,12 @@ public final class PlaybackService implements ScreenManager.Listener {
         return true;
     }
 
-    /** 周期纠偏：只对正在播放且附近有客户端的屏幕重播时间线。 */
+    /** 周期纠偏：重播时间线，并在播放到片尾时自动切队列下一项。 */
     public void rebroadcast() {
         if (closed) {
             return;
         }
+        long now = System.currentTimeMillis();
         for (Map.Entry<String, Playback> entry : states.entrySet()) {
             Playback state = entry.getValue();
             if (state.isStopped() || state.paused()) {
@@ -260,10 +266,92 @@ public final class PlaybackService implements ScreenManager.Listener {
                 continue;
             }
             Screen target = screen.get();
+            if (state.durationMillis() > 0L && state.positionAt(now) >= state.durationMillis() - 250L) {
+                if (queueNext(target)) {
+                    continue;
+                }
+            }
             if (!broadcaster.hasNearbyViewer(target)) {
                 continue;
             }
             broadcaster.playbackChanged(target, state);
+        }
+    }
+
+    /** 队列项。 */
+    public record QueuedMedia(String url, Map<String, String> headers) {
+        public QueuedMedia {
+            url = url == null ? "" : url;
+            headers = headers == null ? Map.of() : Map.copyOf(headers);
+        }
+    }
+
+    /** 追加队列。 */
+    public boolean queueAdd(Screen screen, String url, Map<String, String> headers) {
+        if (screen == null || url == null || url.isBlank()) {
+            return false;
+        }
+        Deque<QueuedMedia> queue = queues.computeIfAbsent(screen.id(), key -> new ArrayDeque<>());
+        synchronized (queue) {
+            if (queue.size() >= 64) {
+                return false;
+            }
+            queue.addLast(new QueuedMedia(url, headers));
+        }
+        return true;
+    }
+
+    /** 队列快照。 */
+    public List<QueuedMedia> queueList(String screenId) {
+        Deque<QueuedMedia> queue = screenId == null ? null : queues.get(screenId);
+        if (queue == null) {
+            return List.of();
+        }
+        synchronized (queue) {
+            return List.copyOf(queue);
+        }
+    }
+
+    /** 清空队列。 */
+    public int queueClear(String screenId) {
+        Deque<QueuedMedia> queue = screenId == null ? null : queues.remove(screenId);
+        if (queue == null) {
+            return 0;
+        }
+        synchronized (queue) {
+            int size = queue.size();
+            queue.clear();
+            return size;
+        }
+    }
+
+    /** 播放下一项；没有队列时返回 false。 */
+    public boolean queueNext(Screen screen) {
+        if (screen == null) {
+            return false;
+        }
+        Deque<QueuedMedia> queue = queues.get(screen.id());
+        if (queue == null) {
+            return false;
+        }
+        QueuedMedia next;
+        synchronized (queue) {
+            next = queue.pollFirst();
+            if (queue.isEmpty()) {
+                queues.remove(screen.id(), queue);
+            }
+        }
+        if (next == null) {
+            return false;
+        }
+        play(screen, next.url(), next.headers());
+        return true;
+    }
+
+    /** 屏幕删除时清理队列。 */
+    public void forgetQueue(String screenId) {
+        if (screenId != null) {
+            queues.remove(screenId);
         }
     }
 
@@ -274,6 +362,7 @@ public final class PlaybackService implements ScreenManager.Listener {
         }
         states.remove(screenId);
         tokens.remove(screenId);
+        queues.remove(screenId);
     }
 
     /** 关服清理。 */

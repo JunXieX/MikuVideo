@@ -77,6 +77,17 @@ public final class MediaResolverService {
                 || path.endsWith(".m4a") || path.endsWith(".aac") || path.endsWith(".ogg"));
     }
 
+    /** B 站关键词搜索；失败时以 CompletionException 返回。 */
+    public CompletableFuture<java.util.List<BilibiliSearchItem>> searchBilibili(String keyword, Path cookies, String proxy) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                return bilibili.search(keyword, 1, cookies, proxy);
+            } catch (Exception error) {
+                throw new java.util.concurrent.CompletionException(error);
+            }
+        }, executor);
+    }
+
     public CompletableFuture<ResolvedMedia> resolve(String url, Path cookies, int maxHeight, String proxy) {
         if (!looksLikePage(url)) {
             return CompletableFuture.completedFuture(direct(url));

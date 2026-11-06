@@ -47,6 +47,21 @@ public final class PlaybackCommands {
                 .then(screenArguments.screenArgument("screen")
                         .executes(context -> stop(context.getSource(), StringArgumentType.getString(context, "screen")))));
 
+        root.then(Commands.literal("queue")
+                .then(Commands.literal("add")
+                        .then(screenArguments.screenArgument("screen")
+                                .then(Commands.argument("url", StringArgumentType.greedyString())
+                                        .executes(this::queueAdd))))
+                .then(Commands.literal("list")
+                        .then(screenArguments.screenArgument("screen")
+                                .executes(this::queueList)))
+                .then(Commands.literal("clear")
+                        .then(screenArguments.screenArgument("screen")
+                                .executes(this::queueClear)))
+                .then(Commands.literal("next")
+                        .then(screenArguments.screenArgument("screen")
+                                .executes(this::queueNext))));
+
         root.then(Commands.literal("seek")
                 .then(screenArguments.screenArgument("screen")
                         .then(Commands.argument("seconds", DoubleArgumentType.doubleArg(0.0D, 86400.0D))
@@ -77,6 +92,81 @@ public final class PlaybackCommands {
         support.playback().play(screen, checked.url(), checked.headers());
         support.reply(source, "<green>已提交播放：<gray>" + Text.trim(checked.url(), 96)
                 + "</gray>（缓冲 " + support.settings().sync().startHoldMs() + " 毫秒后开始计时）");
+        return 1;
+    }
+
+    private int queueAdd(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!support.allow(source)) {
+            return 0;
+        }
+        Screen screen = support.require(source, StringArgumentType.getString(context, "screen"));
+        if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        String raw = StringArgumentType.getString(context, "url").trim();
+        String[] parts = raw.split("\\s+", 2);
+        String rawUrl = parts.length == 0 ? "" : parts[0];
+        String referer = parts.length > 1 ? parts[1].trim() : null;
+        Urls.Checked checked = Urls.validate(rawUrl, referer, support.settings().media());
+        if (!checked.ok()) {
+            support.error(source, checked.message());
+            return 0;
+        }
+        if (!support.playback().queueAdd(screen, checked.url(), checked.headers())) {
+            support.error(source, "队列已满（最多 64 项）");
+            return 0;
+        }
+        support.reply(source, "<green>已加入队列：<gray>" + Text.trim(checked.url(), 96)
+                + "</gray>（当前 " + support.playback().queueList(screen.id()).size() + " 项）");
+        return 1;
+    }
+
+    private int queueList(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!support.allow(source)) {
+            return 0;
+        }
+        Screen screen = support.require(source, StringArgumentType.getString(context, "screen"));
+        if (screen == null) {
+            return 0;
+        }
+        var queue = support.playback().queueList(screen.id());
+        support.reply(source, "<gray>队列 " + screen.name() + "：" + queue.size() + " 项");
+        for (int index = 0; index < queue.size(); index++) {
+            support.reply(source, "<gray>" + (index + 1) + ". <white>" + Text.trim(queue.get(index).url(), 120));
+        }
+        return 1;
+    }
+
+    private int queueClear(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!support.allow(source)) {
+            return 0;
+        }
+        Screen screen = support.require(source, StringArgumentType.getString(context, "screen"));
+        if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        int removed = support.playback().queueClear(screen.id());
+        support.reply(source, "<yellow>已清空队列（" + removed + " 项）");
+        return 1;
+    }
+
+    private int queueNext(CommandContext<CommandSourceStack> context) {
+        CommandSourceStack source = context.getSource();
+        if (!support.allow(source)) {
+            return 0;
+        }
+        Screen screen = support.require(source, StringArgumentType.getString(context, "screen"));
+        if (screen == null || !support.requireManage(source, screen)) {
+            return 0;
+        }
+        if (!support.playback().queueNext(screen)) {
+            support.error(source, "队列为空");
+            return 0;
+        }
+        support.reply(source, "<green>已切换到队列下一项");
         return 1;
     }
 

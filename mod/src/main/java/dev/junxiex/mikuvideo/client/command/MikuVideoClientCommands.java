@@ -11,7 +11,9 @@ import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallba
 import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
 import net.minecraft.ChatFormatting;
+import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.HoverEvent;
 
 import java.nio.file.Path;
 import java.util.concurrent.atomic.AtomicLong;
@@ -99,6 +101,46 @@ public final class MikuVideoClientCommands {
                         }));
                         return 1;
                     }))
+                    .then(ClientCommands.literal("search")
+                            .then(ClientCommands.argument("screen", StringArgumentType.word())
+                                    .then(ClientCommands.argument("keyword", StringArgumentType.greedyString())
+                                            .executes(ctx -> {
+                                                String screen = StringArgumentType.getString(ctx, "screen");
+                                                String keyword = StringArgumentType.getString(ctx, "keyword").trim();
+                                                FabricClientCommandSource source = ctx.getSource();
+                                                ClientConfig config = MikuVideoClient.config();
+                                                Path cookies = null;
+                                                if (config.cookiesFile != null && !config.cookiesFile.isBlank()) {
+                                                    try {
+                                                        cookies = Path.of(config.cookiesFile);
+                                                    } catch (RuntimeException ignored) {
+                                                    }
+                                                }
+                                                info(source, "正在搜索 B 站：" + keyword);
+                                                MikuVideoClient.media().resolver()
+                                                        .searchBilibili(keyword, cookies, config.proxy)
+                                                        .whenComplete((items, error) -> source.getClient().execute(() -> {
+                                                            if (error != null) {
+                                                                error(source, "搜索失败：" + rootMessage(error));
+                                                                return;
+                                                            }
+                                                            if (items.isEmpty()) {
+                                                                info(source, "没有找到结果");
+                                                                return;
+                                                            }
+                                                            for (int index = 0; index < items.size(); index++) {
+                                                                var item = items.get(index);
+                                                                String label = "[" + (index + 1) + "] " + item.title()
+                                                                        + "  §7" + item.author() + "  §8" + formatDuration(item.durationMillis());
+                                                                Component line = Component.literal(label).withStyle(ChatFormatting.AQUA)
+                                                                        .withStyle(style -> style
+                                                                                .withClickEvent(new ClickEvent.RunCommand("/mv play " + screen + " " + item.url()))
+                                                                                .withHoverEvent(new HoverEvent.ShowText(Component.literal("点击播放到 " + screen + "：" + item.url()))));
+                                                                source.sendFeedback(line);
+                                                            }
+                                                        }));
+                                                return 1;
+                                            }))))
                     .then(ClientCommands.literal("cookies")
                             .then(ClientCommands.argument("path", StringArgumentType.greedyString())
                                     .executes(ctx -> {
@@ -168,6 +210,19 @@ public final class MikuVideoClientCommands {
                         info(source, line);
                     }
                 }));
+    }
+
+    private static String rootMessage(Throwable error) {
+        Throwable cursor = error;
+        while (cursor.getCause() != null) {
+            cursor = cursor.getCause();
+        }
+        return cursor.getMessage() == null ? cursor.toString() : cursor.getMessage();
+    }
+
+    private static String formatDuration(long millis) {
+        long seconds = Math.max(0L, millis / 1000L);
+        return String.format("%d:%02d", seconds / 60L, seconds % 60L);
     }
 
     private static void info(FabricClientCommandSource source, String text) {

@@ -65,6 +65,54 @@ public final class BilibiliResolver implements MediaResolver {
                 || host.equals("b23.tv") || host.endsWith(".b23.tv"));
     }
 
+    /** 关键词搜索，供客户端搜索命令使用。 */
+    public List<BilibiliSearchItem> search(String keyword, int page, Path cookiesFile, String proxy) throws Exception {
+        HttpClient client = client(proxy);
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("search_type", "video");
+        params.put("keyword", keyword);
+        params.put("page", Integer.toString(Math.max(1, page)));
+        JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/wbi/search/type?" + signedQuery(params, cookiesFile), cookiesFile);
+        JsonObject data = root.getAsJsonObject("data");
+        JsonArray result = data == null ? null : data.getAsJsonArray("result");
+        if (result == null) {
+            return List.of();
+        }
+        List<BilibiliSearchItem> items = new ArrayList<>();
+        for (JsonElement element : result) {
+            if (items.size() >= 8 || !element.isJsonObject()) {
+                break;
+            }
+            JsonObject item = element.getAsJsonObject();
+            String bvid = optString(item, "bvid");
+            if (bvid.isBlank()) {
+                continue;
+            }
+            String title = optString(item, "title").replaceAll("</?em[^>]*>", "");
+            String author = optString(item, "author");
+            long duration = parseDuration(optString(item, "duration"));
+            items.add(new BilibiliSearchItem(bvid, title, author, duration));
+        }
+        return List.copyOf(items);
+    }
+
+    private static long parseDuration(String text) {
+        if (text == null || text.isBlank()) {
+            return 0L;
+        }
+        String[] parts = text.split(":");
+        try {
+            if (parts.length == 2) {
+                return (Long.parseLong(parts[0]) * 60L + Long.parseLong(parts[1])) * 1000L;
+            }
+            if (parts.length == 3) {
+                return (Long.parseLong(parts[0]) * 3600L + Long.parseLong(parts[1]) * 60L + Long.parseLong(parts[2])) * 1000L;
+            }
+        } catch (NumberFormatException ignored) {
+        }
+        return 0L;
+    }
+
     @Override
     public ResolvedMedia resolve(String url, Path cookiesFile, int maxHeight, String proxy) throws Exception {
         HttpClient client = client(proxy);

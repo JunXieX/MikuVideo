@@ -104,6 +104,7 @@ public final class CommandService {
         support.reply(source, "<white>/mv remove|rename|size|move|access|volume</white> <dark_gray>·</dark_gray> 维护屏幕");
         support.reply(source, "<white>/mv play <屏幕> <链接> [Referer]</white> <dark_gray>·</dark_gray> 播放");
         support.reply(source, "<white>/mv pause|resume|stop|seek <屏幕> [秒]</white> <dark_gray>·</dark_gray> 播放控制");
+        support.reply(source, "<white>/mv queue add|list|clear|next <屏幕></white> <dark_gray>·</dark_gray> 播放队列（播完自动切下一项）");
         support.reply(source, "<white>/mv admin reload|list|remove|stats|purge</white> <dark_gray>·</dark_gray> 管理命令");
     }
 
