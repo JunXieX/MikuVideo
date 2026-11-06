@@ -20,9 +20,10 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -94,6 +95,33 @@ public final class FfmpegMediaSession implements MediaSession {
      * 因此最后一个会话关闭后不会留下常驻线程。</p>
      */
     private static final ScheduledThreadPoolExecutor TIMER = createTimer();
+
+    /**
+     * 存活解码进程登记表。
+     *
+     * <p>会话的关闭是异步的；万一客户端在清理完成前直接退出 JVM，ffmpeg 子进程会变成孤儿进程
+     * 一直占着 CPU。这里在 JVM 退出时统一强杀，作为最后一道兜底（只在退出线程执行，不阻塞业务线程）。</p>
+     */
+    private static final Set<Process> LIVE_PROCESSES = ConcurrentHashMap.newKeySet();
+
+    static {
+        try {
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                for (Process process : LIVE_PROCESSES) {
+                    try {
+                        process.destroyForcibly();
+                    } catch (Throwable ignored) {
+                        // 退出阶段尽力而为
+                    }
+                }
+                LIVE_PROCESSES.clear();
+            }, "mikuvideo-shutdown"));
+        } catch (IllegalStateException ignored) {
+            // JVM 正在关闭时注册钩子会抛异常，此时无需再兜底
+        } catch (SecurityException ignored) {
+            // 受限环境不允许注册钩子
+        }
+    }
 
     private static ScheduledThreadPoolExecutor createTimer() {
         ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(1, runnable -> {
@@ -286,28 +314,32 @@ public final class FfmpegMediaSession implements MediaSession {
         });
     }
 
+    /**
+     * 停止播放。
+     *
+     * <p>只把清理任务投进控制线程队列就返回，永不阻塞调用线程：客户端主线程批量关闭屏幕时
+     * 不能因为等进程退出而掉帧。排在本方法之后到达的 {@link #start(MediaRequest, VideoFrameSink, MediaStateListener)}
+     * 会排在同一队列后面，因此"先停后起"的顺序天然成立。</p>
+     */
     @Override
     public void stop() {
         if (closed) {
             return;
         }
-        Future<?> future = null;
         try {
-            future = control.submit(this::teardown);
+            control.execute(this::teardown);
         } catch (RejectedExecutionException ignored) {
-            return;
-        }
-        if (!MediaThreads.isWorkerThread()) {
-            try {
-                future.get(1200L, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception ignored) {
-                // 超时说明清理还在进行，后台线程会继续完成
-            }
+            // 执行器已关闭
         }
     }
 
+    /**
+     * 关闭会话。
+     *
+     * <p>幂等且不阻塞：只置标记、取消定时器、把清理任务投进控制线程队列，然后关闭执行器
+     * （已排队的任务仍会跑完）。真正的进程销毁、管道关闭、读线程 join 全部在控制线程完成，
+     * 因此主线程可以在一个 tick 内关掉几十块屏幕。</p>
+     */
     @Override
     public void close() {
         if (closed) {
@@ -315,20 +347,10 @@ public final class FfmpegMediaSession implements MediaSession {
         }
         closed = true;
         releasePauseTimer();
-        Future<?> future = null;
         try {
-            future = control.submit(this::teardown);
+            control.execute(this::teardown);
         } catch (RejectedExecutionException ignored) {
             // 执行器已经关闭
-        }
-        if (future != null && !MediaThreads.isWorkerThread()) {
-            try {
-                future.get(3_000L, TimeUnit.MILLISECONDS);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-            } catch (Exception ignored) {
-                // 同上
-            }
         }
         control.shutdown();
     }
@@ -412,7 +434,7 @@ public final class FfmpegMediaSession implements MediaSession {
         Process videoProcess;
         try {
             List<String> args = FfmpegCommands.video(ffmpeg, req, width, height, fps, startMs);
-            videoProcess = new ProcessBuilder(args).start();
+            videoProcess = startProcess(args);
             created.videoProcess = videoProcess;
             created.videoIn = videoProcess.getInputStream();
         } catch (IOException e) {
@@ -443,7 +465,7 @@ public final class FfmpegMediaSession implements MediaSession {
         Process audioProcess;
         try {
             List<String> args = FfmpegCommands.audio(ffmpeg, req, startMs);
-            audioProcess = new ProcessBuilder(args).start();
+            audioProcess = startProcess(args);
             created.audioProcess = audioProcess;
             created.audioIn = audioProcess.getInputStream();
         } catch (IOException e) {
@@ -762,6 +784,7 @@ public final class FfmpegMediaSession implements MediaSession {
         if (process == null) {
             return;
         }
+        LIVE_PROCESSES.remove(process);
         try {
             OutputStream stdin = process.getOutputStream();
             if (stdin != null) {
@@ -786,11 +809,27 @@ public final class FfmpegMediaSession implements MediaSession {
         if (process == null) {
             return;
         }
+        LIVE_PROCESSES.remove(process);
         try {
             process.destroy();
         } catch (RuntimeException ignored) {
             // 已经退出
         }
+    }
+
+    /** 启动解码进程并登记，便于 JVM 退出时兜底回收。 */
+    private static Process startProcess(List<String> args) throws IOException {
+        return startProcess(args, false);
+    }
+
+    private static Process startProcess(List<String> args, boolean mergeError) throws IOException {
+        ProcessBuilder builder = new ProcessBuilder(args);
+        if (mergeError) {
+            builder.redirectErrorStream(true);
+        }
+        Process process = builder.start();
+        LIVE_PROCESSES.add(process);
+        return process;
     }
 
     private static int waitExit(Process process, long millis) {
@@ -880,9 +919,7 @@ public final class FfmpegMediaSession implements MediaSession {
 
         Process process = null;
         try {
-            ProcessBuilder builder = new ProcessBuilder(args);
-            builder.redirectErrorStream(true);
-            process = builder.start();
+            process = startProcess(args, true);
             probeProcess = process;
             StringBuilder sink = new StringBuilder();
             try (InputStream input = process.getInputStream()) {
@@ -904,8 +941,11 @@ public final class FfmpegMediaSession implements MediaSession {
             return 0L;
         } finally {
             probeProcess = null;
-            if (process != null && process.isAlive()) {
-                process.destroyForcibly();
+            if (process != null) {
+                LIVE_PROCESSES.remove(process);
+                if (process.isAlive()) {
+                    process.destroyForcibly();
+                }
             }
         }
     }

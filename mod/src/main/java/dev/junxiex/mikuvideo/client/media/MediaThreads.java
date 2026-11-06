@@ -31,12 +31,6 @@ final class MediaThreads {
         return runnable -> daemon(name, runnable);
     }
 
-    /** 当前线程是否由本引擎创建；用于避免引擎线程互相等待造成死锁。 */
-    static boolean isWorkerThread() {
-        String name = Thread.currentThread().getName();
-        return name != null && name.startsWith("mikuvideo-");
-    }
-
     /** 可中断休眠；返回 false 表示线程被中断。 */
     static boolean park(long nanos) {
         if (nanos <= 0L) {

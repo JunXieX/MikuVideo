@@ -36,6 +36,7 @@ public final class ClientScreen {
     public volatile double distanceSq;
 
     private String reportedDurationUrl = "";
+    private String reportedErrorKey = "";
     private long lastFailureAt;
     private int failureCount;
 
@@ -62,6 +63,7 @@ public final class ClientScreen {
         this.playback = next;
         if (urlChanged) {
             this.reportedDurationUrl = "";
+            this.reportedErrorKey = "";
             this.failureCount = 0;
         }
     }
@@ -91,6 +93,9 @@ public final class ClientScreen {
             return;
         }
         int needed = width * height * 4;
+        if (source.capacity() < needed) {
+            return;
+        }
         synchronized (frameLock) {
             if (staging == null || staging.capacity() < needed) {
                 staging = ByteBuffer.allocateDirect(needed);
@@ -193,6 +198,14 @@ public final class ClientScreen {
 
     public void markDurationReported(String url) {
         reportedDurationUrl = url;
+    }
+
+    public boolean shouldReportError(String key) {
+        return key != null && !key.equals(reportedErrorKey);
+    }
+
+    public void markErrorReported(String key) {
+        reportedErrorKey = key == null ? "" : key;
     }
 
     public String statusText(ClientConfig config) {

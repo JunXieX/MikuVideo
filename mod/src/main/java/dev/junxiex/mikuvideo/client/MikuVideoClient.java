@@ -41,6 +41,9 @@ public final class MikuVideoClient implements ClientModInitializer {
         config = ClientConfig.load();
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
+        if (media().engine() instanceof dev.junxiex.mikuvideo.client.media.FfmpegMediaEngine ffmpegEngine) {
+            ffmpegEngine.prewarm();
+        }
 
         ScreenRenderer.register();
         ClientNetworking.register();

@@ -13,6 +13,7 @@ import net.minecraft.client.Minecraft;
 public final class ClientNetworking {
     private static boolean helloPending = true;
     private static long lastHelloAt;
+    private static int helloAttempts;
     private static String lastDimension;
 
     private ClientNetworking() {
@@ -28,6 +29,7 @@ public final class ClientNetworking {
     public static void onJoin() {
         helloPending = true;
         lastHelloAt = 0L;
+        helloAttempts = 0;
         lastDimension = null;
         sendHello();
     }
@@ -45,7 +47,7 @@ public final class ClientNetworking {
             send(new Message.RequestSyncC2S());
         }
         lastDimension = dimension;
-        if (helloPending && System.currentTimeMillis() - lastHelloAt > 1_000L) {
+        if (helloPending && helloAttempts < 30 && System.currentTimeMillis() - lastHelloAt > 1_000L) {
             sendHello();
         }
     }
@@ -55,6 +57,7 @@ public final class ClientNetworking {
             return;
         }
         lastHelloAt = System.currentTimeMillis();
+        helloAttempts++;
         send(new Message.HelloC2S(Protocol.VERSION, modVersion(), lastHelloAt));
     }
 

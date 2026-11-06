@@ -152,6 +152,10 @@ public final class MediaManager {
                 entry.lastSeekAt = now;
             }
         }
+        if (session.state() == MediaState.ERROR && screen.shouldReportError(playback.url())) {
+            screen.markErrorReported(playback.url());
+            ClientNetworking.send(new Message.MediaErrorC2S(info.id(), 5, session.lastError()));
+        }
         if (session.state() == MediaState.ERROR && screen.failureCount() < 3
                 && screen.lastFailureAt() + 10_000L < System.currentTimeMillis()) {
             close(info.id());
