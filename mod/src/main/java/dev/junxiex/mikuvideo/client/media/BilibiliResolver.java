@@ -87,7 +87,7 @@ public final class BilibiliResolver implements MediaResolver {
         params.put("keyword", keyword);
         params.put("page", Integer.toString(Math.max(1, page)));
         JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/wbi/search/type?"
-                + signedQuery(params, cookies), cookies);
+                + signedQuery(params, cookies, proxy), cookies);
         JsonObject data = root.getAsJsonObject("data");
         JsonArray result = data == null ? null : data.getAsJsonArray("result");
         if (result == null) {
@@ -202,7 +202,7 @@ public final class BilibiliResolver implements MediaResolver {
         playParams.put("fourk", "1");
         playParams.put("platform", "pc");
         playParams.put("high_quality", "1");
-        JsonObject play = data(client, "https://api.bilibili.com/x/player/playurl?" + signedQuery(playParams, cookies), cookies);
+        JsonObject play = data(client, "https://api.bilibili.com/x/player/playurl?" + signedQuery(playParams, cookies, proxy), cookies);
         String title = optString(data, "title");
         long duration = optLong(data, "duration", 0L) * 1000L;
         String referer = "https://www.bilibili.com/video/" + resolvedBvid;
@@ -253,7 +253,7 @@ public final class BilibiliResolver implements MediaResolver {
         params.put("fourk", "1");
         params.put("qn", "127");
         JsonObject rootPlay = root(client, "https://api.bilibili.com/pgc/player/web/v2/playurl?"
-                + signedQuery(params, cookies), cookies);
+                + signedQuery(params, cookies, proxy), cookies);
         JsonObject playResult = rootPlay.has("result") ? rootPlay.getAsJsonObject("result") : null;
         JsonObject videoInfo = playResult == null ? null : playResult.getAsJsonObject("video_info");
         String title = optString(result, "title");
@@ -670,7 +670,7 @@ public final class BilibiliResolver implements MediaResolver {
         return data;
     }
 
-    private String signedQuery(Map<String, String> params, CookieSource cookies) {
+    private String signedQuery(Map<String, String> params, CookieSource cookies, String proxy) {
         Map<String, String> all = new LinkedHashMap<>(params);
         all.put("wts", Long.toString(System.currentTimeMillis() / 1000L));
         List<String> keys = new ArrayList<>(all.keySet());
@@ -682,7 +682,7 @@ public final class BilibiliResolver implements MediaResolver {
             }
             base.append(urlEncode(key)).append('=').append(urlEncode(filterValue(all.get(key))));
         }
-        WbiKeys wbi = wbiKeys(cookies);
+        WbiKeys wbi = wbiKeys(cookies, proxy);
         if (wbi == null) {
             return base.toString();
         }
@@ -690,14 +690,14 @@ public final class BilibiliResolver implements MediaResolver {
         return base + "&w_rid=" + wRid;
     }
 
-    private WbiKeys wbiKeys(CookieSource cookies) {
+    private WbiKeys wbiKeys(CookieSource cookies, String proxy) {
         long now = System.currentTimeMillis();
         WbiKeys cached = wbiKeys;
         if (cached != null && now - wbiFetchedAt < 20L * 60L * 60L * 1000L) {
             return cached;
         }
         try {
-            HttpClient client = client("");
+            HttpClient client = client(proxy);
             // 未登录时 nav 会返回 code=-101，但 data.wbi_img 仍然存在，不能按业务错误丢弃。
             JsonObject root = root(client, "https://api.bilibili.com/x/web-interface/nav", cookies);
             JsonObject data = root.getAsJsonObject("data");

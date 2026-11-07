@@ -24,6 +24,8 @@ import java.util.concurrent.Executors;
  */
 public final class MediaResolverService {
     private static final long CACHE_MILLIS = 5 * 60 * 1000L;
+    /** 缓存超过这个条数时顺手清一次过期项，避免长会话只增不减。 */
+    private static final int CACHE_LIMIT = 64;
     private static final Set<String> PAGE_HOSTS = Set.of(
             "bilibili.com", "b23.tv", "douyin.com", "iesdouyin.com");
 
@@ -154,7 +156,11 @@ public final class MediaResolverService {
         if (media.live()) {
             return;
         }
-        cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
+        long now = System.currentTimeMillis();
+        if (cache.size() > CACHE_LIMIT) {
+            cache.entrySet().removeIf(entry -> entry.getValue().expiresAt <= now);
+        }
+        cache.put(key, new Cached(media, now + CACHE_MILLIS));
     }
 
     public void shutdown() {

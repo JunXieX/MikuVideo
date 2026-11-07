@@ -172,7 +172,7 @@ public final class MediaManager {
             if (resolved != null && resolved.durationMillis() > 0L && playback.durationMillis() <= 0L
                     && screen.shouldReportDuration(url)) {
                 screen.markDurationReported(url);
-                ClientNetworking.send(new Message.DurationC2S(info.id(), resolved.durationMillis()));
+                ClientNetworking.send(new Message.DurationC2S(info.id(), url, resolved.durationMillis()));
             }
         }
         MediaSession session = entry.session;
@@ -221,7 +221,7 @@ public final class MediaManager {
         long duration = session.durationMillis();
         if (duration > 0L && screen.shouldReportDuration(playback.url())) {
             screen.markDurationReported(playback.url());
-            ClientNetworking.send(new Message.DurationC2S(info.id(), duration));
+            ClientNetworking.send(new Message.DurationC2S(info.id(), url, duration));
         }
     }
 

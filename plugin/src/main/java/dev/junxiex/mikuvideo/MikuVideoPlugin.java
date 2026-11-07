@@ -134,16 +134,22 @@ public final class MikuVideoPlugin extends JavaPlugin {
      * @return 是否成功
      */
     public boolean reloadSettings() {
+        Settings next;
         try {
             reloadConfig();
-            settings = Settings.load(this);
-            Permissions.register(this, tierPermissions());
-            startTimers();
-            return true;
+            next = Settings.load(this);
         } catch (RuntimeException error) {
-            getLogger().log(Level.SEVERE, "配置重载失败，继续使用旧配置", error);
+            getLogger().log(Level.SEVERE, "配置重载失败，继续使用原有配置", error);
             return false;
         }
+        settings = next;
+        try {
+            Permissions.register(this, tierPermissions());
+        } catch (RuntimeException error) {
+            getLogger().log(Level.SEVERE, "权限节点注册失败，分级限制可能不生效", error);
+        }
+        startTimers();
+        return true;
     }
 
     private void enableServices() {

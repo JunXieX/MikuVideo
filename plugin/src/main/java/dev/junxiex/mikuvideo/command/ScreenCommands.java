@@ -240,6 +240,10 @@ public final class ScreenCommands {
                 support.error(source, "请看向 6 格内的方块表面");
                 return;
             }
+            if (support.screens().occupied(hit.get(), screen.id())) {
+                support.error(source, "这个位置已经有同朝向的屏幕了");
+                return;
+            }
             support.screens().replace(screen.withGeometry(hit.get()));
             support.reply(source, "<green>屏幕已移动到当前视线位置");
         });

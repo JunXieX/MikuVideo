@@ -14,7 +14,7 @@ public final class Protocol {
     public static final String CHANNEL = "mikuvideo:main";
 
     /** 协议版本，任何字段变更都要递增。 */
-    public static final int VERSION = 2;
+    public static final int VERSION = 3;
 
     /** 单条插件消息上限（原版 CustomPayload 上限为 1 MiB，这里留出余量）。 */
     public static final int MAX_MESSAGE_BYTES = 1024 * 1024;

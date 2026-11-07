@@ -76,6 +76,7 @@ public final class MessageCodec {
                 }
                 case Message.DurationC2S duration -> {
                     writeString(out, duration.screenId(), Protocol.MAX_SCREEN_ID);
+                    writeString(out, duration.url(), Protocol.MAX_URL);
                     out.writeLong(duration.durationMillis());
                 }
                 case Message.RequestSyncC2S ignored -> {
@@ -143,7 +144,10 @@ public final class MessageCodec {
                         in.readInt(),
                         readString(in, Protocol.MAX_ERROR_MESSAGE));
                 case Protocol.C2S_PONG -> new Message.PongC2S(in.readLong(), in.readLong());
-                case Protocol.C2S_DURATION -> new Message.DurationC2S(readString(in, Protocol.MAX_SCREEN_ID), in.readLong());
+                case Protocol.C2S_DURATION -> new Message.DurationC2S(
+                        readString(in, Protocol.MAX_SCREEN_ID),
+                        readString(in, Protocol.MAX_URL),
+                        in.readLong());
                 case Protocol.C2S_REQUEST_SYNC -> new Message.RequestSyncC2S();
                 case Protocol.C2S_CREDENTIAL_REQUEST -> new Message.CredentialRequestC2S();
                 default -> throw new ProtocolException("未知操作码: " + op);

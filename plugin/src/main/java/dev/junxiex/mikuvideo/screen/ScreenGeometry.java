@@ -59,7 +59,7 @@ public final class ScreenGeometry {
         Vector center = new Vector(block.getX() + 0.5D, block.getY() + 0.5D, block.getZ() + 0.5D)
                 .add(face.getDirection().multiply(0.5D))
                 .add(basis.get().normal().multiply(SURFACE_OFFSET));
-        return Optional.of(new Hit(world.getName(), center.getX(), center.getY(), center.getZ(), basis.get()));
+        return Optional.of(new Hit(world.getKey().toString(), center.getX(), center.getY(), center.getZ(), basis.get()));
     }
 
     /** 方块面到屏幕基向量；斜面返回空。 */
@@ -73,8 +73,9 @@ public final class ScreenGeometry {
         }
         normal = normal.normalize();
         return switch (face) {
-            case UP -> Optional.of(new Screen.Basis(normal, new Vector(1, 0, 0), new Vector(0, 0, 1)));
-            case DOWN -> Optional.of(new Screen.Basis(normal, new Vector(1, 0, 0), new Vector(0, 0, -1)));
+            // 顶/底面固定 up 的符号要与 right × up = normal 保持一致，否则客户端按固定绕序绘制时被背面剔除
+            case UP -> Optional.of(new Screen.Basis(normal, new Vector(1, 0, 0), new Vector(0, 0, -1)));
+            case DOWN -> Optional.of(new Screen.Basis(normal, new Vector(1, 0, 0), new Vector(0, 0, 1)));
             default -> {
                 Vector up = WORLD_UP.clone();
                 Vector right = up.clone().crossProduct(normal);

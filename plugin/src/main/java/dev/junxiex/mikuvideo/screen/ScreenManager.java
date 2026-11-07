@@ -340,6 +340,16 @@ public final class ScreenManager {
         return null;
     }
 
+    /** 该位置是否已有同朝向的屏幕；{@code excludeId} 用于移动自身时跳过自己。 */
+    public boolean occupied(ScreenGeometry.Hit hit, String excludeId) {
+        for (Screen existing : inWorld(hit.world())) {
+            if (!existing.id().equals(excludeId) && isDuplicate(existing, hit)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private boolean isDuplicate(Screen existing, ScreenGeometry.Hit hit) {
         if (!existing.world().equals(hit.world())) {
             return false;

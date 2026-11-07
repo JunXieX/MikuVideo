@@ -340,7 +340,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
             plugin.getLogger().warning("屏幕 " + id + " 的 owner 非法，已跳过");
             return null;
         }
-        String world = optString(object, "world", "");
+        String world = normalizeWorld(optString(object, "world", ""));
         if (world.isBlank()) {
             plugin.getLogger().warning("屏幕 " + id + " 缺少世界名，已跳过");
             return null;

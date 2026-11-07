@@ -72,6 +72,8 @@ public final class ClientScreen {
         Playback previous = this.playback;
         boolean urlChanged = previous == null || !previous.url().equals(next.url());
         boolean jumped = previous != null && Math.abs(next.positionMillis() - previous.positionMillis()) > 2_000L;
+        // 循环重播时 URL 和位置都不变，只有时间线重新计时；不认这一条，ended 永远清不掉
+        boolean restarted = previous != null && next.startEpochMillis() != previous.startEpochMillis();
         this.playback = next;
         if (urlChanged) {
             this.reportedDurationUrl = "";
@@ -85,7 +87,7 @@ public final class ClientScreen {
             // 服务端主动跳转（seek / 循环回到开头）时立即校正，不必等 7 秒冷却
             forceSeek = true;
         }
-        if (urlChanged || jumped || next.isStopped()) {
+        if (urlChanged || jumped || restarted || next.isStopped()) {
             clearEnded();
         }
     }

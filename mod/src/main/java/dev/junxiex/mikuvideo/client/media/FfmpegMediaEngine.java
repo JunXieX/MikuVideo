@@ -93,6 +93,12 @@ public final class FfmpegMediaEngine implements MediaEngine {
         return autoDownload;
     }
 
+    /** 是否正在后台下载 ffmpeg；此时"找不到二进制"只是暂时状态。 */
+    public boolean isDownloading() {
+        CompletableFuture<Path> future = autoDownloadFuture;
+        return future != null && !future.isDone();
+    }
+
     /** 清空定位缓存，下次使用时重新按顺序探测。 */
     public void reload() {
         locator.reload();

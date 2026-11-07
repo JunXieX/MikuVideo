@@ -51,10 +51,13 @@ public final class PacketListener implements PluginMessageListener {
     private static final long WARN_INTERVAL_MILLIS = 5000L;
     /** 同一玩家重复握手的忽略窗口。 */
     private static final long HELLO_COOLDOWN_MILLIS = 1000L;
+    /** 同一玩家请求全量同步的最小间隔。 */
+    private static final long SYNC_REQUEST_COOLDOWN_MILLIS = 1000L;
 
     private final Map<String, Long> muted = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastWarnAt = new ConcurrentHashMap<>();
     private final Map<UUID, Long> lastHelloAt = new ConcurrentHashMap<>();
+    private final Map<UUID, Long> lastSyncAt = new ConcurrentHashMap<>();
 
     public PacketListener(Plugin plugin, ClientRegistry clients, SyncService sync, ScreenManager screens,
                           PlaybackService playback, MenuService menu, CookieService cookieService,
@@ -143,6 +146,14 @@ public final class PacketListener implements PluginMessageListener {
         if (!clients.isRegistered(player.getUniqueId())) {
             return;
         }
+        long now = System.currentTimeMillis();
+        Long previous = lastSyncAt.put(player.getUniqueId(), now);
+        if (previous != null && now - previous < SYNC_REQUEST_COOLDOWN_MILLIS) {
+            return;
+        }
+        if (lastSyncAt.size() > MUTE_LIMIT) {
+            lastSyncAt.entrySet().removeIf(entry -> now - entry.getValue() > SYNC_REQUEST_COOLDOWN_MILLIS);
+        }
         sync.requestFullSync(player);
     }
 
@@ -188,16 +199,21 @@ public final class PacketListener implements PluginMessageListener {
             muted.entrySet().removeIf(entry -> entry.getValue() <= now);
         }
         muted.put(key, now + MUTE_MILLIS);
+        String detail = Text.plain(error.message(), Protocol.MAX_ERROR_MESSAGE);
         plugin.getLogger().warning("客户端媒体错误：" + player.getName() + " 屏幕 " + error.screenId()
-                + " code=" + error.code() + " message=" + Text.trimBytes(error.message(), Protocol.MAX_ERROR_MESSAGE));
+                + " code=" + error.code() + " message=" + detail);
         Screen screen = screens.get(error.screenId()).orElse(null);
         if (screen == null) {
+            return;
+        }
+        if (!screen.publicScreen() && !screen.ownedBy(player.getUniqueId())
+                && !player.hasPermission(Permissions.MANAGE_OTHERS)) {
             return;
         }
         Player ownerPlayer = Bukkit.getPlayer(screen.owner());
         if (ownerPlayer != null && !ownerPlayer.getUniqueId().equals(player.getUniqueId())) {
             sync.notice(ownerPlayer, Protocol.NOTICE_WARN, "<yellow>你的屏幕 " + screen.name()
-                    + " 在客户端播放失败：" + Text.trimBytes(error.message(), 128));
+                    + " 在客户端播放失败：" + Text.trimBytes(detail, 128));
         }
     }
 
@@ -222,13 +238,19 @@ public final class PacketListener implements PluginMessageListener {
             if (screen == null || !player.isOnline()) {
                 return;
             }
-            if (!screen.world().equals(player.getWorld().getName())) {
+            if (!screen.world().equals(player.getWorld().getKey().toString())) {
                 return;
             }
             if (screen.distanceSquared(player.getEyeLocation()) > settings.get().sync().viewDistanceSquared()) {
                 return;
             }
-            playback.reportDuration(screen, duration.durationMillis());
+            if (!duration.url().equals(playback.state(screen.id()).url())) {
+                // 上报的是上一部片子的时长，切源之后到达，丢弃
+                return;
+            }
+            boolean authoritative = screen.ownedBy(player.getUniqueId())
+                    || player.hasPermission(Permissions.MANAGE_OTHERS);
+            playback.reportDuration(screen, duration.durationMillis(), authoritative);
         });
     }
 }
