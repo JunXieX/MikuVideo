@@ -11,6 +11,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ## 功能特性
 
 - **每名玩家管理自己的屏幕**：位置、尺寸、朝向、音量、公开/私有；完整图形菜单与命令两套入口。
+- **协议 v3**：服务端与客户端必须同版本更新，旧客户端会收到明确的「请更新客户端模组」提示。
 - **B 站原生解析**：视频、番剧、直播、分 P、`av`/`BV`/`ep`/`ss`/短链，WBI 签名直连官方 API，输出 DASH 音视频双流，支持 360p～8K 画质档位。
 - **B 站搜索**：聊天栏输入关键词，结果可点击直接播放到指定屏幕；服务端凭证可自动用于搜索与解析。
 - **抖音支持**：直播间原生抓取 HLS/FLV；视频走可配置解析接口，接口可换成自建服务或关闭。
@@ -39,7 +40,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.9.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.1.0.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -49,7 +50,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.9.jar` 放进 `mods/`。
+2. 把 `MikuVideo-Client-1.1.0.jar` 放进 `mods/`。
 3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
