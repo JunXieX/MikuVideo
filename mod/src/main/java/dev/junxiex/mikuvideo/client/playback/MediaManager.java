@@ -137,13 +137,17 @@ public final class MediaManager {
             return;
         }
         long serverNow = ClockSync.serverNow();
+        ResolvedMedia resolved = screen.resolved(url);
+        boolean live = resolved != null && resolved.live();
         long expected = playback.positionAt(serverNow);
-        if (playback.durationMillis() > 0L) {
+        if (live) {
+            // 直播没有可对齐的时间轴：既有位置对直播毫无意义，-ss 还会把流拖到窗口外
+            expected = 0L;
+        } else if (playback.durationMillis() > 0L) {
             expected = Math.min(expected, playback.durationMillis());
         }
         int width = decodeWidth(info, config);
         int height = decodeHeight(info, config, width);
-        ResolvedMedia resolved = screen.resolved(url);
         MediaRequest request = resolved == null
                 ? new MediaRequest(url, playback.headers(), Math.max(0L, expected), width, height, config.fps, config.audioEnabled)
                 : resolved.toRequest(Math.max(0L, expected), width, height, config.fps, config.audioEnabled, playback.headers());
@@ -159,7 +163,7 @@ public final class MediaManager {
         }
         if (entry == null) {
             MediaSession session = engine.createSession();
-            entry = new Entry(session, key);
+            entry = new Entry(session, key, live);
             entries.put(info.id(), entry);
             session.start(request, screen::offerFrame, (state, detail) -> screen.setMediaState(state, detail));
             if (playback.paused()) {
@@ -188,10 +192,12 @@ public final class MediaManager {
             return;
         }
         long now = System.currentTimeMillis();
-        if (screen.consumeForceSeek()) {
+        boolean forceSeek = screen.consumeForceSeek();
+        // 直播一律不 seek：FLV 直播没有索引，HLS 直播窗口只有几十秒，跳一次就是长时间黑屏
+        if (!live && forceSeek) {
             session.seek(expected);
             entry.lastSeekAt = now;
-        } else if (!playback.paused() && entry.lastSeekAt + SEEK_COOLDOWN_MS < now) {
+        } else if (!live && !playback.paused() && entry.lastSeekAt + SEEK_COOLDOWN_MS < now) {
             long actual = session.positionMillis();
             if (actual > 0L && (expected - actual > BEHIND_TOLERANCE_MS || actual - expected > AHEAD_TOLERANCE_MS)) {
                 session.seek(expected);
@@ -279,6 +285,33 @@ public final class MediaManager {
         }
     }
 
+    /** 诊断输出：每块正在解码的屏幕一行，供 /mikuvideo-client diag 使用。 */
+    public List<String> diagnostics() {
+        if (entries.isEmpty()) {
+            return List.of("当前没有正在解码的屏幕");
+        }
+        List<String> lines = new ArrayList<>();
+        for (Map.Entry<String, Entry> pair : entries.entrySet()) {
+            Entry entry = pair.getValue();
+            MediaSession session = entry.session;
+            StringBuilder line = new StringBuilder()
+                    .append(pair.getKey())
+                    .append(" | ").append(entry.live ? "直播" : "点播")
+                    .append(" | ").append(session.state())
+                    .append(" | 位置 ").append(session.positionMillis() / 1000L).append('s');
+            long duration = session.durationMillis();
+            if (duration > 0L) {
+                line.append('/').append(duration / 1000L).append('s');
+            }
+            String message = session.lastError();
+            if (message != null && !message.isBlank()) {
+                line.append(" | ").append(message.length() > 90 ? message.substring(0, 90) + "…" : message);
+            }
+            lines.add(line.toString());
+        }
+        return List.copyOf(lines);
+    }
+
     public MediaState stateOf(String screenId) {
         Entry entry = entries.get(screenId);
         return entry == null ? MediaState.IDLE : entry.session.state();
@@ -287,11 +320,13 @@ public final class MediaManager {
     private static final class Entry {
         private final MediaSession session;
         private final String key;
+        private final boolean live;
         private long lastSeekAt;
 
-        private Entry(MediaSession session, String key) {
+        private Entry(MediaSession session, String key, boolean live) {
             this.session = session;
             this.key = key;
+            this.live = live;
         }
     }
 }

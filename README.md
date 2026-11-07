@@ -39,7 +39,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.8.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.9.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -49,7 +49,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.8.jar` 放进 `mods/`。
+2. 把 `MikuVideo-Client-1.0.9.jar` 放进 `mods/`。
 3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
@@ -144,6 +144,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mikuvideo-client douyinapi <接口\|default\|off>` | 设置抖音视频解析接口，`off` 关闭（直播不受影响） |
 | `/mikuvideo-client credential status\|refresh\|clear` | 查看 / 重新申请 / 清除本服 B 站凭证 |
 | `/mikuvideo-client resolver` | 查看当前解析链路状态 |
+| `/mikuvideo-client diag` | 逐屏输出解码状态：直播/点播、状态、位置、时长、最近一次解码错误 |
 | `/mikuvideo-client reload` | 重载客户端配置 |
 
 ## 权限节点
@@ -253,7 +254,7 @@ limits:
 确认双方都装了客户端模组、协议版本一致、屏幕在同一世界且在 `view-distance` 内；私有屏幕只有主人和有 `mikuvideo.manage.others` 的玩家能看到。
 
 **屏幕全黑或提示解码失败？**
-先执行 `/mikuvideo-client status` 看 FFmpeg 是否就绪；再确认链接能直接打开、是否需要 Referer；HLS 直播源在首次连接时可能需要几秒。
+先执行 `/mikuvideo-client status` 看 FFmpeg 是否就绪，再用 `/mikuvideo-client diag` 看每块屏的具体状态与错误；再确认链接能直接打开、是否需要 Referer；HLS 直播源在首次连接时可能需要几秒。
 
 **播放卡顿？**
 降低 `/mikuvideo-client streams`，或在 `config/mikuvideo.json` 里降低 `maxWidth` / `maxHeight` / `fps` / `pixelsPerBlock`。屏幕越大、同时可见的屏幕越多，客户端解码压力越高。

@@ -23,6 +23,9 @@ import java.security.MessageDigest;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -48,6 +51,10 @@ public final class BilibiliResolver implements MediaResolver {
     private static final Pattern SEASON = Pattern.compile("/ss(\\d+)", Pattern.CASE_INSENSITIVE);
     private static final Pattern LIVE = Pattern.compile("^/(\\d+)");
     private static final int[] QUALITY_RANK = {16, 32, 64, 74, 80, 112, 116, 120, 127};
+    /** 直播候选探活的单次超时。 */
+    private static final Duration PROBE_TIMEOUT = Duration.ofSeconds(3);
+    /** 一轮最多并发探几个候选，够覆盖多 host 又不至于把请求打散。 */
+    private static final int MAX_PROBES = 4;
     private static final int MIXIN_TABLE_LENGTH = 32;
     private static final int[] MIXIN_KEY_ENC_TAB = {
             46, 47, 18, 2, 53, 8, 23, 32, 15, 50, 10, 31, 58, 3, 45, 35,
@@ -365,33 +372,64 @@ public final class BilibiliResolver implements MediaResolver {
     }
 
     /**
-     * 依次探活，返回第一个可用的地址。
+     * 并发探活，返回第一个可用的地址，最慢 {@link #PROBE_TIMEOUT} 一轮。
      *
-     * <p>用 HEAD 只问状态码，不落一个字节的流数据；CDN 不理 HEAD 返回 405 视为存活。
-     * 探测全部失败但都是网络异常时，退回第一个候选，交给播放层去试一次。</p>
+     * <p>串行探测在「第一个 host 卡住」时会白等好几秒，玩家看到的是长时间黑屏，
+     * 所以这里同时问前几个候选，谁先应声就用谁。HEAD 只问状态码，不落流数据；
+     * CDN 不理 HEAD 返回 405 视为存活。</p>
      */
     private static String firstPlayable(HttpClient client, List<String> candidates) {
-        String fallback = "";
-        for (String candidate : candidates) {
-            try {
-                HttpRequest probe = HttpRequest.newBuilder(URI.create(candidate))
-                        .timeout(Duration.ofSeconds(4))
-                        .method("HEAD", HttpRequest.BodyPublishers.noBody())
-                        .header("User-Agent", UA)
-                        .header("Referer", REFERER)
-                        .header("Origin", "https://live.bilibili.com")
-                        .build();
-                int code = client.send(probe, HttpResponse.BodyHandlers.discarding()).statusCode();
-                if (code == 200 || code == 206 || code == 405) {
-                    return candidate;
-                }
-            } catch (Exception ignored) {
-                if (fallback.isEmpty()) {
-                    fallback = candidate;
+        if (candidates.isEmpty()) {
+            return "";
+        }
+        List<String> probeList = new ArrayList<>(candidates.subList(0, Math.min(MAX_PROBES, candidates.size())));
+        ExecutorService pool = Executors.newFixedThreadPool(probeList.size(), runnable -> {
+            Thread thread = new Thread(runnable, "mikuvideo-live-probe");
+            thread.setDaemon(true);
+            return thread;
+        });
+        List<Future<String>> futures = new ArrayList<>(probeList.size());
+        try {
+            for (String candidate : probeList) {
+                futures.add(pool.submit(() -> liveProbe(client, candidate) ? candidate : ""));
+            }
+            boolean uncertain = false;
+            String fallback = "";
+            for (int index = 0; index < futures.size(); index++) {
+                try {
+                    String value = futures.get(index).get();
+                    if (!value.isBlank()) {
+                        return value;
+                    }
+                } catch (Exception ignored) {
+                    uncertain = true;
+                    if (fallback.isEmpty()) {
+                        fallback = probeList.get(index);
+                    }
                 }
             }
+            // 全部明确 404 时返回空串，让上层换时间戳重问一次；网络异常则交回第一个候选给播放层试
+            return uncertain ? fallback : "";
+        } finally {
+            pool.shutdownNow();
         }
-        return fallback;
+    }
+
+    /** HEAD 只取状态码；200/206/405 视为可用。 */
+    private static boolean liveProbe(HttpClient client, String url) {
+        try {
+            HttpRequest probe = HttpRequest.newBuilder(URI.create(url))
+                    .timeout(PROBE_TIMEOUT)
+                    .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                    .header("User-Agent", UA)
+                    .header("Referer", REFERER)
+                    .header("Origin", "https://live.bilibili.com")
+                    .build();
+            int code = client.send(probe, HttpResponse.BodyHandlers.discarding()).statusCode();
+            return code == 200 || code == 206 || code == 405;
+        } catch (Exception ignored) {
+            return false;
+        }
     }
 
     /** 解析 playurl 的 dash/durl。 */

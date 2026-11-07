@@ -220,6 +220,13 @@ public final class MikuVideoClientCommands {
                                 info(ctx.getSource(), "已清除本服保存的 B 站凭证");
                                 return 1;
                             })))
+                    .then(ClientCommands.literal("diag").executes(ctx -> {
+                        FabricClientCommandSource source = ctx.getSource();
+                        for (String line : MikuVideoClient.media().diagnostics()) {
+                            info(source, line);
+                        }
+                        return 1;
+                    }))
                     .then(ClientCommands.literal("reload").executes(ctx -> {
                         MikuVideoClient.reloadConfig();
                         FabricClientCommandSource source = ctx.getSource();
