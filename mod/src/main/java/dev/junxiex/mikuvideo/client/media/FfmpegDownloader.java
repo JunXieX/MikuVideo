@@ -53,7 +53,8 @@ public final class FfmpegDownloader {
 
     private final Path root;
     private final ProgressSink progress;
-    private final Object lock = new Object();
+    /** 下载串行化必须跨实例生效：不同实例写的是同一个 .part 文件。 */
+    private static final Object DOWNLOAD_LOCK = new Object();
 
     public FfmpegDownloader(Path root) {
         this(root, (done, total) -> {
@@ -152,7 +153,7 @@ public final class FfmpegDownloader {
 
     /** 强制下载（已存在也复用）。 */
     public Path download() throws IOException {
-        synchronized (lock) {
+        synchronized (DOWNLOAD_LOCK) {
             String key = platformKey();
             if (key == null) {
                 throw new IOException(unsupportedReason());

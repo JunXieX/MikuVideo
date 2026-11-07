@@ -115,6 +115,19 @@ public final class Text {
         return value.substring(0, index);
     }
 
+    /** 把控制字符（含换行）替换成空格并按字节截断，用于写日志或提示客户端传来的文本。 */
+    public static String safe(String value, int maxBytes) {
+        if (value == null || value.isEmpty()) {
+            return "";
+        }
+        StringBuilder builder = new StringBuilder(value.length());
+        for (int i = 0; i < value.length(); i++) {
+            char c = value.charAt(i);
+            builder.append(c < 0x20 || c == 0x7F ? ' ' : c);
+        }
+        return trimBytes(builder.toString(), maxBytes);
+    }
+
     /** 截断字符串到指定长度（按字符计）。 */
     public static String trim(String value, int max) {
         if (value == null) {

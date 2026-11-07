@@ -106,8 +106,13 @@ public final class FfmpegLocator {
         if (attempted) {
             return cached;
         }
-        // 另一个线程正在扫描时不阻塞调用方：主线程只拿缓存，扫描完成后下次调用自然命中。
-        if (!scanLock.tryLock()) {
+        // 另一个线程正在扫描时短暂等待，避免把"正在扫描"当成"没有 ffmpeg"报出去。
+        try {
+            if (!scanLock.tryLock(2L, TimeUnit.SECONDS)) {
+                return cached;
+            }
+        } catch (InterruptedException error) {
+            Thread.currentThread().interrupt();
             return cached;
         }
         try {

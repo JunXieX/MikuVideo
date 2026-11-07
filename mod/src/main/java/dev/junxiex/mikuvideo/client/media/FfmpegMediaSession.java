@@ -192,7 +192,7 @@ public final class FfmpegMediaSession implements MediaSession {
             this.consumedFrames.set(0L);
             this.durationMs = 0L;
             this.durationUrl = "";
-            reportMissingFfmpeg();
+            reportUnavailable();
             return;
         }
         submit("start", () -> {
@@ -432,7 +432,7 @@ public final class FfmpegMediaSession implements MediaSession {
     private void launch(MediaRequest req, long startMs) {
         Path ffmpeg = engine.executable();
         if (ffmpeg == null) {
-            reportMissingFfmpeg();
+            reportUnavailable();
             return;
         }
         int width = req.maxWidth();
@@ -617,25 +617,36 @@ public final class FfmpegMediaSession implements MediaSession {
             current.line = line;
 
             byte[] chunk = current.audioChunk;
+            // 管道读不保证按帧对齐，残留的 1~3 字节留到下一轮拼起来，否则整段 PCM 会错位成噪声
+            int carry = 0;
             while (!current.stop && !closed) {
                 if (!awaitPlayable(current)) {
                     break;
                 }
-                int read = input.read(chunk, 0, chunk.length);
+                int read = input.read(chunk, carry, chunk.length - carry);
                 if (read <= 0) {
                     break;
                 }
+                read += carry;
+                int aligned = read - (read % 4);
+                carry = read - aligned;
+                if (aligned == 0) {
+                    continue;
+                }
                 float gain = volume;
                 if (gain < 0.999f) {
-                    scaleSamples(chunk, read, gain);
+                    scaleSamples(chunk, aligned, gain);
                 }
                 int offset = 0;
-                while (offset < read && !current.stop) {
-                    int written = line.write(chunk, offset, read - offset);
+                while (offset < aligned && !current.stop) {
+                    int written = line.write(chunk, offset, aligned - offset);
                     if (written <= 0) {
                         break;
                     }
                     offset += written;
+                }
+                if (carry > 0) {
+                    System.arraycopy(chunk, aligned, chunk, 0, carry);
                 }
             }
         } catch (LineUnavailableException | IllegalArgumentException e) {
@@ -782,10 +793,11 @@ public final class FfmpegMediaSession implements MediaSession {
             flushLine(line);
             closeLine(line);
         }
-        closeQuietly(current.videoIn);
-        closeQuietly(current.audioIn);
+        // 先杀进程：进程退出会让阻塞在空管道上的读线程返回，此时再关流不会被拖到 -rw_timeout
         destroyProcess(current.audioProcess);
         destroyProcess(current.videoProcess);
+        closeQuietly(current.videoIn);
+        closeQuietly(current.audioIn);
         MediaThreads.join(current.audioThread, JOIN_MS);
         MediaThreads.join(current.videoThread, JOIN_MS);
         MediaThreads.join(current.audioErrThread, 300L);
@@ -876,6 +888,22 @@ public final class FfmpegMediaSession implements MediaSession {
     // ------------------------------------------------------------------
     // 时长探测
     // ------------------------------------------------------------------
+
+    /** 二进制缺失时区分"正在下载"与"真的没有"，前者只是还没准备好。 */
+    private void reportUnavailable() {
+        if (engine.isDownloading()) {
+            applyState(MediaState.PREPARING, "正在下载 ffmpeg…");
+            // 下载结束时在控制线程上重试一次，否则这块屏幕会一直停在准备态
+            engine.downloadFuture().whenComplete((binary, error) ->
+                    submit("ffmpeg-ready", () -> {
+                        if (!closed && run == null && request != null) {
+                            launch(request, basePositionMs);
+                        }
+                    }));
+            return;
+        }
+        reportMissingFfmpeg();
+    }
 
     private void reportMissingFfmpeg() {
         lastErrorCode = FfmpegError.BINARY_MISSING;

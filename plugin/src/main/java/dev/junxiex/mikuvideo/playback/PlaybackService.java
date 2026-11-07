@@ -231,17 +231,21 @@ public final class PlaybackService implements ScreenManager.Listener {
     }
 
     /**
-     * 记录客户端上报的时长：同一链接只接受第一次上报。
+     * 记录客户端上报的时长。
      *
+     * <p>普通观众只能在首次上报时写值，屏幕拥有者（或跨屏管理）随时可覆盖：
+     * 首次上报可能来自把直播/HLS 时长读错一截的客户端，不能就此把这个错误钉死。</p>
+     *
+     * @param authoritative 上报者是否有权纠正已有时长
      * @return 是否真的写入
      */
-    public boolean reportDuration(Screen screen, long durationMillis) {
+    public boolean reportDuration(Screen screen, long durationMillis, boolean authoritative) {
         if (screen == null || closed || durationMillis <= 0L) {
             return false;
         }
         long clamped = Math.min(durationMillis, MAX_SEEK_MILLIS);
         Playback current = states.get(screen.id());
-        if (current == null || current.isStopped() || current.durationMillis() > 0L) {
+        if (current == null || current.isStopped() || (current.durationMillis() > 0L && !authoritative)) {
             return false;
         }
         Playback updated = current.withDuration(clamped);

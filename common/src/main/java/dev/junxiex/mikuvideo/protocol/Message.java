@@ -108,7 +108,7 @@ public sealed interface Message {
         }
     }
 
-    record DurationC2S(String screenId, long durationMillis) implements Message {
+    record DurationC2S(String screenId, String url, long durationMillis) implements Message {
         @Override
         public int op() {
             return Protocol.C2S_DURATION;

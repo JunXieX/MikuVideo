@@ -88,7 +88,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         if (!clients.isRegistered(player.getUniqueId())) {
             return;
         }
-        String world = player.getWorld().getName();
+        String world = player.getWorld().getKey().toString();
         worlds.put(player.getUniqueId(), world);
         List<Screen> found = visibleScreens(player);
         if (found.size() > Protocol.MAX_SCREEN_COUNT) {
@@ -128,7 +128,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         if (!clients.isRegistered(player.getUniqueId())) {
             return;
         }
-        String world = player.getWorld().getName();
+        String world = player.getWorld().getKey().toString();
         String last = worlds.put(player.getUniqueId(), world);
         if (last != null && !last.equals(world)) {
             clearAndSync(player);
@@ -174,7 +174,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         if (player == null || !player.isOnline() || !clients.isRegistered(player.getUniqueId())) {
             return;
         }
-        String world = player.getWorld().getName();
+        String world = player.getWorld().getKey().toString();
         String last = worlds.get(player.getUniqueId());
         worlds.put(player.getUniqueId(), world);
         if (last != null && last.equals(world)) {
@@ -370,7 +370,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
     private List<Screen> visibleScreens(Player player) {
         Settings current = settings.get();
         double limit = current.sync().viewDistanceSquared();
-        String world = player.getWorld().getName();
+        String world = player.getWorld().getKey().toString();
         UUID id = player.getUniqueId();
         boolean all = player.hasPermission(Permissions.MANAGE_OTHERS);
         // 眼睛坐标只取一次，避免在屏幕循环里反复构造 Location
@@ -417,7 +417,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
             if (!clients.isRegistered(player.getUniqueId())) {
                 continue;
             }
-            if (!player.getWorld().getName().equals(world)) {
+            if (!player.getWorld().getKey().toString().equals(world)) {
                 continue;
             }
             Set<String> known = visible.get(player.getUniqueId());

@@ -247,14 +247,17 @@ public record Settings(Limits limits, SyncSettings sync, Media media, Bilibili b
         if (root == null) {
             return defaults();
         }
+        int maxScreens = intOf(root, "limits.max-screens-per-player", 8, 1, 1000);
+        double maxWidth = doubleOf(root, "limits.max-screen-width", 16.0D, 0.5D, 64.0D);
+        double maxHeight = doubleOf(root, "limits.max-screen-height", 9.0D, 0.5D, 64.0D);
         Limits limits = new Limits(
-                intOf(root, "limits.max-screens-per-player", 8, 1, 1000),
-                doubleOf(root, "limits.max-screen-width", 16.0D, 0.5D, 64.0D),
-                doubleOf(root, "limits.max-screen-height", 9.0D, 0.5D, 64.0D),
+                maxScreens,
+                maxWidth,
+                maxHeight,
                 doubleOf(root, "limits.min-screen-width", 0.5D, 0.5D, 16.0D),
                 doubleOf(root, "limits.min-screen-height", 0.5D, 0.5D, 16.0D),
                 intOf(root, "limits.max-total-screens", Protocol.MAX_SCREEN_COUNT, 1, Protocol.MAX_SCREEN_COUNT),
-                readTiers(root, 8, 16.0D, 9.0D));
+                readTiers(root, maxScreens, maxWidth, maxHeight));
 
         SyncSettings sync = new SyncSettings(
                 doubleOf(root, "sync.view-distance", 64.0D, 4.0D, 512.0D),

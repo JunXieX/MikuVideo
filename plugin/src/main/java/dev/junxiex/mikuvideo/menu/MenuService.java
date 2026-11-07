@@ -472,6 +472,10 @@ public final class MenuService {
             message(player, "<red>请看向 6 格内的方块表面");
             return;
         }
+        if (screens.occupied(hit.get(), screen.id())) {
+            message(player, "<red>这个位置已经有同朝向的屏幕了");
+            return;
+        }
         screens.replace(screen.withGeometry(hit.get()));
         message(player, "<green>屏幕已移动到当前视线位置");
         openControl(player, screenId);
