@@ -113,9 +113,6 @@ public final class ClientRegistry {
         return List.copyOf(clients.values());
     }
 
-    public int size() {
-        return clients.size();
-    }
 
     public void clear() {
         clients.clear();

@@ -68,10 +68,6 @@ public final class FfmpegDownloader {
         } : progress;
     }
 
-    /** 下载根目录。 */
-    public Path root() {
-        return root;
-    }
 
     /**
      * 当前平台标识：{@code windows-x64}、{@code linux-x64}、{@code linux-aarch64}；

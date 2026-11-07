@@ -55,9 +55,6 @@ public final class LimitService {
         if (best != null) {
             return best;
         }
-        if (limits.tiers().isEmpty()) {
-            return limits.fallbackTier();
-        }
         // 配置了分级但玩家一个都不匹配：按 0 块处理，避免绕过权限白拿额度
         return new Settings.Tier("none", "", 0, limits.minScreenWidth(), limits.minScreenHeight(), 0.0D, List.of());
     }

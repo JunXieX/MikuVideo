@@ -71,19 +71,12 @@ public final class FfmpegLocator {
         return isWindows() ? "ffmpeg.exe" : "ffmpeg";
     }
 
-    public Path gameDir() {
-        return gameDir;
-    }
 
     /** 游戏目录内放置 ffmpeg 的目录：{@code <gameDir>/mikuvideo/ffmpeg}。 */
     public Path bundleDir() {
         return gameDir.resolve("mikuvideo").resolve("ffmpeg");
     }
 
-    /** 显式配置的路径，未配置时为 {@code null}。 */
-    public String explicitPath() {
-        return explicitPath;
-    }
 
     /** 设置显式路径；传空表示清除。支持直接给可执行文件或它所在的目录。 */
     public void setPath(String path) {
@@ -153,15 +146,6 @@ public final class FfmpegLocator {
         return failure;
     }
 
-    /** 给界面用的单行描述。 */
-    public String describe() {
-        Path found = locate();
-        if (found == null) {
-            return "未找到 ffmpeg（" + failure + "）";
-        }
-        String v = version;
-        return "ffmpeg " + (v.isEmpty() ? "" : v + " ") + "[" + found + "]";
-    }
 
     private void invalidate() {
         cached = null;

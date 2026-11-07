@@ -49,8 +49,4 @@ final class StderrRing {
         }
         return builder.toString();
     }
-
-    synchronized boolean isEmpty() {
-        return count == 0;
-    }
 }

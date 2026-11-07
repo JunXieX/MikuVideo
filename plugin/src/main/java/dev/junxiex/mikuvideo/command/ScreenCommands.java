@@ -43,7 +43,7 @@ public final class ScreenCommands {
     public void attach(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("create")
                 .requires(source -> source.getSender().hasPermission(Permissions.CREATE))
-                .then(Commands.argument("name", StringArgumentType.word())
+                .then(Commands.argument("name", StringArgumentType.greedyString())
                         .executes(context -> create(context, null, null))
                         .then(Commands.argument("width", DoubleArgumentType.doubleArg(0.1D, 64.0D))
                                 .executes(context -> create(context, DoubleArgumentType.getDouble(context, "width"), null))
@@ -58,7 +58,7 @@ public final class ScreenCommands {
 
         root.then(Commands.literal("rename")
                 .then(screenArgument("screen")
-                        .then(Commands.argument("name", StringArgumentType.word())
+                        .then(Commands.argument("name", StringArgumentType.greedyString())
                                 .executes(context -> rename(context.getSource(),
                                         StringArgumentType.getString(context, "screen"),
                                         StringArgumentType.getString(context, "name"))))));

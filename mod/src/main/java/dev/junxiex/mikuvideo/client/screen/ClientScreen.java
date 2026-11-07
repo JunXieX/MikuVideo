@@ -241,10 +241,6 @@ public final class ClientScreen {
         }
     }
 
-    public MediaState mediaState() {
-        return mediaState;
-    }
-
     public String mediaDetail() {
         return mediaDetail;
     }
@@ -299,10 +295,7 @@ public final class ClientScreen {
         return true;
     }
 
-    public long expectedPositionMillis(long serverNow) {
-        Playback current = playback;
-        return current == null ? 0L : current.positionAt(serverNow);
-    }
+
 
     public boolean shouldReportDuration(String url) {
         return url != null && !url.isBlank() && !url.equals(reportedDurationUrl);

@@ -25,8 +25,6 @@ public final class FfmpegError {
     public static final int NO_VIDEO = 4;
     /** 连接或读取超时。 */
     public static final int TIMEOUT = 5;
-    /** 输入里没有音频流。 */
-    public static final int NO_AUDIO = 6;
     /** 本机没有可用的 ffmpeg。 */
     public static final int BINARY_MISSING = 7;
     /** 进程本身启动失败或异常退出。 */
@@ -59,8 +57,6 @@ public final class FfmpegError {
                 return "输入中没有视频流";
             case TIMEOUT:
                 return "连接或读取超时";
-            case NO_AUDIO:
-                return "输入中没有音频流";
             case BINARY_MISSING:
                 return "未找到 ffmpeg";
             case PROCESS:
@@ -132,14 +128,6 @@ public final class FfmpegError {
         return UNKNOWN;
     }
 
-    /** 归类音频解码进程的 stderr 尾部；无音频流是正常情况，单独成一类。 */
-    public static int classifyAudio(String stderr) {
-        String text = stderr == null ? "" : stderr.toLowerCase(Locale.ROOT);
-        if (text.contains("does not contain any stream") || text.contains("matches no streams")) {
-            return NO_AUDIO;
-        }
-        return classify(stderr);
-    }
 
     /** 组装 {@code E2 资源不存在（404）：<stderr 尾部>} 形式的一行可读错误。 */
     public static String format(int code, String stderr) {

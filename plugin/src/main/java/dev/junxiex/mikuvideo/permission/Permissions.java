@@ -90,8 +90,4 @@ public final class Permissions {
         extraRegistered.clear();
     }
 
-    /** 全部节点名，供帮助与统计展示。 */
-    public static List<String> names() {
-        return NODES.stream().map(Node::name).toList();
-    }
 }

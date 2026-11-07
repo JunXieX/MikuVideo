@@ -212,15 +212,5 @@ public final class MikuVideoClient implements ClientModInitializer {
         }
     }
 
-    /** 供状态文本使用。 */
-    public static Playback playbackOf(String screenId) {
-        ClientScreen screen = ScreenRegistry.INSTANCE.get(screenId);
-        return screen == null ? Playback.stopped() : screen.playback();
-    }
 
-    /** 供调试使用。 */
-    public static ScreenInfo infoOf(String screenId) {
-        ClientScreen screen = ScreenRegistry.INSTANCE.get(screenId);
-        return screen == null ? null : screen.info();
-    }
 }

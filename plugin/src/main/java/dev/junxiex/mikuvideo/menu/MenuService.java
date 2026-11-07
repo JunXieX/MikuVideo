@@ -86,24 +86,9 @@ public final class MenuService {
         tasks.runFor(player, () -> doOpenUrlEditor(player, screenId));
     }
 
-    /** 尺寸输入页。 */
-    public void openSizeEditor(Player player, String screenId) {
-        tasks.runFor(player, () -> doOpenSizeEditor(player, screenId));
-    }
-
-    /** 音量页。 */
-    public void openVolumeEditor(Player player, String screenId) {
-        tasks.runFor(player, () -> doOpenVolumeEditor(player, screenId));
-    }
-
     /** 删除二次确认。 */
     public void openDeleteConfirm(Player player, String screenId) {
         tasks.runFor(player, () -> doOpenDeleteConfirm(player, screenId));
-    }
-
-    /** 管理页：全服屏幕一览。 */
-    public void openAdmin(Player player, int page) {
-        tasks.runFor(player, () -> doOpenAdmin(player, page));
     }
 
     // ---------------------------------------------------------------- 列表
@@ -263,50 +248,6 @@ public final class MenuService {
         show(player, Component.text("MikuVideo · 设置链接"), body, inputs, buttons, 2);
     }
 
-    private void doOpenSizeEditor(Player player, String screenId) {
-        Screen screen = screens.get(screenId).orElse(null);
-        if (screen == null || !canManage(player, screen)) {
-            message(player, settings.get().messages().screenNotFound());
-            return;
-        }
-        Settings.Limits limits = settings.get().limits();
-        List<DialogBody> body = List.of(DialogBody.plainMessage(Component.text("宽度 " + limits.minScreenWidth()
-                + " ~ " + limits.maxScreenWidth() + "，高度 " + limits.minScreenHeight()
-                + " ~ " + limits.maxScreenHeight())));
-        List<DialogInput> inputs = List.of(
-                DialogInput.text("width", Component.text("宽度")).maxLength(16)
-                        .initial(Float.toString(screen.width())).build(),
-                DialogInput.text("height", Component.text("高度")).maxLength(16)
-                        .initial(Float.toString(screen.height())).build());
-        List<ActionButton> buttons = List.of(
-                button(Component.text("应用"), Component.text("按输入值调整尺寸"),
-                        click((response, clicker) -> applySize(clicker, screenId, response))),
-                button(Component.text("返回控制页"), Component.text("不修改尺寸"),
-                        click((response, clicker) -> openControl(clicker, screenId))));
-        show(player, Component.text("MikuVideo · 屏幕尺寸"), body, inputs, buttons, 2);
-    }
-
-    private void doOpenVolumeEditor(Player player, String screenId) {
-        Screen screen = screens.get(screenId).orElse(null);
-        if (screen == null || !canManage(player, screen)) {
-            message(player, settings.get().messages().screenNotFound());
-            return;
-        }
-        List<DialogBody> body = List.of(
-                DialogBody.plainMessage(Component.text("当前音量：" + screen.volume())));
-        List<DialogInput> inputs = List.of(
-                DialogInput.numberRange("volume", Component.text("音量"), 0.0F, 100.0F)
-                        .initial((float) screen.volume())
-                        .step(1.0F)
-                        .build());
-        List<ActionButton> buttons = List.of(
-                button(Component.text("应用"), Component.text("保存音量"),
-                        click((response, clicker) -> applyVolume(clicker, screenId, response))),
-                button(Component.text("返回控制页"), Component.text("不修改音量"),
-                        click((response, clicker) -> openControl(clicker, screenId))));
-        show(player, Component.text("MikuVideo · 音量"), body, inputs, buttons, 2);
-    }
-
     private void doOpenDeleteConfirm(Player player, String screenId) {
         Screen screen = screens.get(screenId).orElse(null);
         if (screen == null || !canManage(player, screen)) {
@@ -331,41 +272,6 @@ public final class MenuService {
     }
 
     // ---------------------------------------------------------------- 管理页
-
-    private void doOpenAdmin(Player player, int page) {
-        List<Screen> list = screens.all();
-        int pages = Math.max(1, (list.size() + PAGE_SIZE - 1) / PAGE_SIZE);
-        int current = Math.max(0, Math.min(page, pages - 1));
-        List<DialogBody> body = List.of(
-                DialogBody.plainMessage(Component.text("全服屏幕 " + list.size() + " 块，第 "
-                        + (current + 1) + " / " + pages + " 页")),
-                DialogBody.plainMessage(Component.text("在线客户端 " + clients.size() + " 个")));
-        List<ActionButton> buttons = new ArrayList<>();
-        int from = current * PAGE_SIZE;
-        int to = Math.min(list.size(), from + PAGE_SIZE);
-        for (int i = from; i < to; i++) {
-            Screen screen = list.get(i);
-            buttons.add(button(Component.text("删除 · " + screen.name()),
-                    Component.text(screen.id() + "　" + screen.world() + "　归属 "
-                            + screen.owner().toString().substring(0, 8)),
-                    click((response, clicker) -> delete(clicker, screen.id()))));
-        }
-        if (buttons.isEmpty()) {
-            buttons.add(button(Component.text("全服没有屏幕"), Component.text("无需清理"),
-                    click((response, clicker) -> message(clicker, "<gray>全服没有屏幕"))));
-        }
-        if (current > 0) {
-            int target = current - 1;
-            buttons.add(button(Component.text("上一页"), Component.text("第 " + (target + 1) + " 页"),
-                    click((response, clicker) -> openAdmin(clicker, target))));
-        }
-        if (current < pages - 1) {
-            int target = current + 1;
-            buttons.add(button(Component.text("下一页"), Component.text("第 " + (target + 1) + " 页"),
-                    click((response, clicker) -> openAdmin(clicker, target))));
-        }
-        show(player, Component.text("MikuVideo · 管理"), body, List.of(), buttons, 2);
-    }
 
     // ---------------------------------------------------------------- 动作
 

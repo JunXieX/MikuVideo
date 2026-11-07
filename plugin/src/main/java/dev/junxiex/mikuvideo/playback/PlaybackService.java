@@ -40,10 +40,6 @@ public final class PlaybackService implements ScreenManager.Listener {
             }
 
             @Override
-            public void screenChanged(Screen screen) {
-            }
-
-            @Override
             public boolean hasNearbyViewer(Screen screen) {
                 return false;
             }
@@ -51,9 +47,6 @@ public final class PlaybackService implements ScreenManager.Listener {
 
         /** 播放状态变化。 */
         void playbackChanged(Screen screen, Playback playback);
-
-        /** 屏幕本身（尺寸 / 可见性 / 音量字段）变化。 */
-        void screenChanged(Screen screen);
 
         /** 该屏幕附近是否还有客户端，用于跳过无人时的周期纠偏。 */
         boolean hasNearbyViewer(Screen screen);
@@ -93,10 +86,6 @@ public final class PlaybackService implements ScreenManager.Listener {
         return states.computeIfAbsent(screen.id(), id -> Playback.stopped().withVolume(screen.volume()));
     }
 
-    /** 全量快照，供持久化使用。 */
-    public Map<String, Playback> snapshot() {
-        return Map.copyOf(states);
-    }
 
     /** 载入阶段导入历史状态。 */
     public void importState(String screenId, Playback playback) {
@@ -399,12 +388,6 @@ public final class PlaybackService implements ScreenManager.Listener {
         return added;
     }
 
-    /** 屏幕删除时清理队列。 */
-    public void forgetQueue(String screenId) {
-        if (screenId != null) {
-            queues.remove(screenId);
-        }
-    }
 
     /** 屏幕被删除时清理状态。 */
     public void forget(String screenId) {

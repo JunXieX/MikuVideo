@@ -250,8 +250,7 @@ public final class SyncService implements PlaybackService.Broadcaster, ScreenMan
         }
     }
 
-    @Override
-    public void screenChanged(Screen screen) {
+    private void screenChanged(Screen screen) {
         if (screen == null) {
             return;
         }

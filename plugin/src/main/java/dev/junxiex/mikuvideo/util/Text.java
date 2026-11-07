@@ -39,32 +39,7 @@ public final class Text {
         return parse(prefix).append(body == null ? Component.empty() : body);
     }
 
-    /** 纯文本组件，null 视为空串。 */
-    public static Component plain(String value) {
-        return Component.text(value == null ? "" : value);
-    }
 
-    /**
-     * 按 {@code {key}} 占位符替换文本。
-     *
-     * @param template 模板
-     * @param pairs    键值对，顺序为 键, 值, 键, 值...
-     */
-    public static String fill(String template, String... pairs) {
-        if (template == null) {
-            return "";
-        }
-        String result = template;
-        for (int i = 0; i + 1 < pairs.length; i += 2) {
-            String key = pairs[i];
-            String value = pairs[i + 1];
-            if (key == null || key.isEmpty()) {
-                continue;
-            }
-            result = result.replace("{" + key + "}", value == null ? "" : value);
-        }
-        return result;
-    }
 
     /** UTF-8 编码后的字节长度。 */
     public static int utf8Length(String value) {

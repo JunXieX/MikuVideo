@@ -44,8 +44,8 @@ import java.util.logging.Level;
  */
 public final class ScreenStorage implements ScreenManager.Listener {
 
-    /** 数据格式版本，字段变更时递增。 */
-    public static final int DATA_VERSION = 1;
+    /** 数据格式版本，字段变更时递增。2：世界字段改为维度 key，顶/底面基向量归一到右手系。 */
+    public static final int DATA_VERSION = 2;
 
     /** 载入结果。 */
     public record Loaded(Screen screen, Playback playback, List<PlaybackService.QueuedMedia> queue) {
@@ -132,11 +132,11 @@ public final class ScreenStorage implements ScreenManager.Listener {
         if (!scheduled.compareAndSet(false, true)) {
             return;
         }
-        long debounce = Math.max(100L, settings.get().storage().saveDebounceMs());
+        long debounce = settings.get().storage().saveDebounceMs();
         tasks.asyncLater(this::drain, debounce);
     }
 
-    /** 同步落盘，最多等待给定毫秒；关服与 admin reload 使用。 */
+    /** 同步落盘，最多等待给定毫秒；只在关服时使用。 */
     public boolean flush(long timeoutMillis) {
         boolean locked = false;
         try {
@@ -458,11 +458,7 @@ public final class ScreenStorage implements ScreenManager.Listener {
         if (element == null || element.isJsonNull() || !element.isJsonPrimitive()) {
             return fallback;
         }
-        try {
-            return element.getAsString();
-        } catch (RuntimeException error) {
-            return fallback;
-        }
+        return element.getAsString();
     }
 
     private static int optInt(JsonObject object, String key, int fallback) {
@@ -506,10 +502,6 @@ public final class ScreenStorage implements ScreenManager.Listener {
         if (element == null || element.isJsonNull() || !element.isJsonPrimitive()) {
             return fallback;
         }
-        try {
-            return element.getAsBoolean();
-        } catch (RuntimeException error) {
-            return fallback;
-        }
+        return element.getAsBoolean();
     }
 }

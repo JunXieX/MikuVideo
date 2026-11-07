@@ -13,7 +13,7 @@ import java.util.function.Consumer;
  * 引擎本身不做任何 Minecraft 相关操作，纯 JDK 实现，可单独测试。</p>
  *
  * <p>线程安全：除了首次定位会短暂探测一次外，所有方法都不阻塞调用线程；
- * {@link #downloadAsync(Consumer)} 与 {@link #prewarm()} 的结果都在后台线程完成。
+ * {@link #downloadAsync(Consumer)} 的结果在后台线程完成。
  * 定位结果会被缓存，因此 {@link #isAvailable()} 与 {@link #statusText()} 在第一次调用之后是纯读取。</p>
  *
  * <p>下载是显式行为：默认只在本地查找；打开 {@link #setAutoDownload(boolean)} 后，
@@ -35,6 +35,8 @@ public final class FfmpegMediaEngine implements MediaEngine {
     private volatile String downloadFailure = "";
     private volatile boolean autoDownload;
     private volatile CompletableFuture<Path> autoDownloadFuture;
+    /** 自动下载只尝试一次，失败后等玩家手动重试。 */
+    private volatile boolean downloadAttempted;
 
     /** 以当前工作目录作为游戏目录。 */
     public FfmpegMediaEngine() {
@@ -56,9 +58,6 @@ public final class FfmpegMediaEngine implements MediaEngine {
         return locator;
     }
 
-    public FfmpegDownloader downloader() {
-        return downloader;
-    }
 
     /** 当前实际使用的 ffmpeg，未找到时为 {@code null}。 */
     public Path executable() {
@@ -79,19 +78,12 @@ public final class FfmpegMediaEngine implements MediaEngine {
         locator.setPath(path);
     }
 
-    /** {@link #setPreferredPath(String)} 的同义方法。 */
-    public void setFfmpegPath(String path) {
-        locator.setPath(path);
-    }
 
     /** 允许在找不到 ffmpeg 时后台自动下载一次；默认关闭。 */
     public void setAutoDownload(boolean enabled) {
         this.autoDownload = enabled;
     }
 
-    public boolean isAutoDownload() {
-        return autoDownload;
-    }
 
     /** 是否正在后台下载 ffmpeg；此时"找不到二进制"只是暂时状态。 */
     public boolean isDownloading() {
@@ -110,19 +102,6 @@ public final class FfmpegMediaEngine implements MediaEngine {
         locator.reload();
     }
 
-    /** 在后台完成首次定位，避免第一次 {@link #isAvailable()} 卡在探测上。 */
-    public void prewarm() {
-        if (locator.isResolved()) {
-            return;
-        }
-        MediaThreads.daemon("prewarm", () -> {
-            try {
-                locator.locate();
-            } catch (Throwable ignored) {
-                // 预解析失败不影响后续调用
-            }
-        }).start();
-    }
 
     /**
      * 在后台下载并解压 ffmpeg，完成后把路径交给定位器。
@@ -157,23 +136,6 @@ public final class FfmpegMediaEngine implements MediaEngine {
         return future;
     }
 
-    /**
-     * 同步下载版本，供已经在后台线程里的调用方使用。
-     *
-     * @throws IOException 当前平台不支持自动下载或网络失败
-     */
-    public Path downloadFfmpeg(FfmpegDownloader.ProgressSink sink) throws IOException {
-        FfmpegDownloader worker = sink == null ? downloader : new FfmpegDownloader(locator.bundleDir(), sink);
-        try {
-            Path binary = worker.downloadIfMissing();
-            locator.setPath(binary.toString());
-            downloadFailure = "";
-            return binary;
-        } catch (IOException e) {
-            downloadFailure = e.getMessage() == null ? e.toString() : e.getMessage();
-            throw e;
-        }
-    }
 
     @Override
     public MediaSession createSession() {
@@ -214,9 +176,12 @@ public final class FfmpegMediaEngine implements MediaEngine {
 
     private void triggerAutoDownload() {
         synchronized (downloadLock) {
-            if (autoDownloadFuture != null && !autoDownloadFuture.isDone()) {
+            // 失败过的自动下载不再重试：调用方（executable/statusText）是热路径，
+            // 重试会变成「失败即重下」的死循环，手动 download 命令才是重试入口。
+            if (downloadAttempted) {
                 return;
             }
+            downloadAttempted = true;
             autoDownloadFuture = downloadAsync(null);
         }
     }

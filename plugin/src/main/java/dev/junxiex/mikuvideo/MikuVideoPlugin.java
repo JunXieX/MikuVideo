@@ -41,12 +41,10 @@ public final class MikuVideoPlugin extends JavaPlugin {
     private ScreenStorage storage;
     private ServerIdentity serverIdentity;
     private CookieService cookieService;
-    private LimitService limitService;
     private ClientRegistry clientRegistry;
     private SyncService syncService;
     private MenuService menuService;
     private PacketListener packetListener;
-    private CommandService commandService;
     private ScheduledTask rescanTask;
     private ScheduledTask rebroadcastTask;
     private ScheduledTask pingTask;
@@ -161,7 +159,7 @@ public final class MikuVideoPlugin extends JavaPlugin {
         settings = Settings.load(this);
         tasks = new Tasks(this);
         serverIdentity = new ServerIdentity(this);
-        limitService = new LimitService(this::settings);
+        LimitService limitService = new LimitService(this::settings);
         screenManager = new ScreenManager(this::settings);
         playbackService = new PlaybackService(screenManager, this::settings, tasks);
         storage = new ScreenStorage(this, screenManager, playbackService, this::settings, tasks);
@@ -193,8 +191,7 @@ public final class MikuVideoPlugin extends JavaPlugin {
 
         CommandSupport commandSupport = new CommandSupport(this, screenManager, playbackService,
                 syncService, clientRegistry, menuService, limitService, tasks);
-        commandService = new CommandService(this, commandSupport);
-        commandService.register();
+        new CommandService(this, commandSupport).register();
 
         getServer().getPluginManager().registerEvents(new PlayerListener(syncService, clientRegistry, tasks), this);
 

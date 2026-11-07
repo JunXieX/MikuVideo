@@ -301,8 +301,4 @@ public final class PlaybackCommands {
         return -1.0D;
     }
 
-    /** 便于外部复用的 URL 上限提示。 */
-    public static String describeLimit(int limit) {
-        return "链接长度上限 " + Math.min(limit, Protocol.MAX_URL) + " 字符";
-    }
 }

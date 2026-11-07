@@ -776,10 +776,10 @@ public final class FfmpegMediaSession implements MediaSession {
     }
 
     /**
-     * 彻底拆掉一轮解码：停声卡、关管道、destroy 进程、join 读线程。
+     * 彻底拆掉一轮解码：杀进程、关管道、join 读线程。
      *
-     * <p>顺序上先停音频再停视频：音频线程可能正阻塞在 {@code line.write}，
-     * 先关 line 能让它立刻返回，不必等进程退出。</p>
+     * <p>必须先杀进程再关管道：读线程可能正阻塞在空管道的 {@code read} 上，
+     * 只有进程退出才能让它返回，否则 close 会被拖到读写超时。</p>
      */
     private void destroy(Run current) {
         current.stop = true;
@@ -896,9 +896,14 @@ public final class FfmpegMediaSession implements MediaSession {
             // 下载结束时在控制线程上重试一次，否则这块屏幕会一直停在准备态
             engine.downloadFuture().whenComplete((binary, error) ->
                     submit("ffmpeg-ready", () -> {
-                        if (!closed && run == null && request != null) {
-                            launch(request, basePositionMs);
+                        if (closed || run != null || request == null) {
+                            return;
                         }
+                        if (error != null) {
+                            reportMissingFfmpeg();
+                            return;
+                        }
+                        launch(request, basePositionMs);
                     }));
             return;
         }
@@ -911,7 +916,7 @@ public final class FfmpegMediaSession implements MediaSession {
         applyState(MediaState.ERROR, lastError);
     }
 
-    /** 同一地址只探测一次；探测线程是守护线程，关闭会话时会被一起销毁。 */
+    /** 探测片长；直播不进这里。探测线程是守护线程，关闭会话时会被一起销毁。 */
     private void startDurationProbe(MediaRequest req) {
         String url = req.url();
         if (durationMs > 0L && Objects.equals(durationUrl, url)) {

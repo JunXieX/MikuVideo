@@ -29,9 +29,6 @@ public final class Tasks {
         this.plugin = plugin;
     }
 
-    public Plugin plugin() {
-        return plugin;
-    }
 
     /** 全局区域延迟执行（单位 tick）。 */
     public void globalLater(Runnable action, long delayTicks) {
@@ -59,16 +56,6 @@ public final class Tasks {
         return task;
     }
 
-    /** 异步立即执行，用于纯计算与磁盘 IO。 */
-    public void asyncNow(Runnable action) {
-        if (closed || action == null) {
-            return;
-        }
-        Bukkit.getAsyncScheduler().runNow(plugin, task -> {
-            handles.remove(task);
-            safe(action);
-        });
-    }
 
     /** 异步延迟执行（单位毫秒）。 */
     public void asyncLater(Runnable action, long delayMillis) {

@@ -119,9 +119,11 @@ public final class MediaManager {
         }
         ScreenInfo info = screen.info();
         if (!ClientUrls.isAllowed(playback.url(), config.allowPrivateHosts)) {
-            screen.setMediaState(MediaState.ERROR, "客户端拒绝本机/内网地址");
+            // 只在首次拒绝时报一次：每 tick 重复 setMediaState 会把失败额度烧光，
+            // 玩家改完 allowPrivateHosts 重载后这块屏就再也起不来了。
             if (screen.shouldReportError(playback.url())) {
                 screen.markErrorReported(playback.url());
+                screen.setMediaState(MediaState.ERROR, "客户端拒绝本机/内网地址");
                 ClientNetworking.send(new Message.MediaErrorC2S(info.id(), 6, "客户端拒绝本机/内网地址"));
             }
             return;
@@ -154,9 +156,6 @@ public final class MediaManager {
         String key = request.url() + "|" + request.audioUrl() + "|" + request.headers().hashCode()
                 + "|" + width + "x" + height + "|" + config.fps + "|" + config.audioEnabled;
         Entry entry = entries.get(info.id());
-        if (entry == null && screen.failureCount() >= 3) {
-            return;
-        }
         if (entry != null && !entry.key.equals(key)) {
             close(info.id());
             entry = null;
@@ -312,10 +311,6 @@ public final class MediaManager {
         return List.copyOf(lines);
     }
 
-    public MediaState stateOf(String screenId) {
-        Entry entry = entries.get(screenId);
-        return entry == null ? MediaState.IDLE : entry.session.state();
-    }
 
     private static final class Entry {
         private final MediaSession session;
