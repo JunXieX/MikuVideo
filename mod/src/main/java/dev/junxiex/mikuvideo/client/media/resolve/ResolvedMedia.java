@@ -31,6 +31,6 @@ public record ResolvedMedia(
         }
         merged.putAll(videoHeaders);
         return new MediaRequest(videoUrl, audioUrl, merged, audioHeaders,
-                startPositionMillis, width, height, fps, audioEnabled);
+                startPositionMillis, width, height, fps, audioEnabled, live);
     }
 }

@@ -81,6 +81,10 @@ public final class FfmpegMediaEngine implements MediaEngine {
 
     /** 允许在找不到 ffmpeg 时后台自动下载一次；默认关闭。 */
     public void setAutoDownload(boolean enabled) {
+        if (enabled && !this.autoDownload) {
+            // 由关到开视为玩家明确要求重试，允许再自动下载一次
+            downloadAttempted = false;
+        }
         this.autoDownload = enabled;
     }
 

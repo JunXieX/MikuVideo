@@ -454,7 +454,9 @@ public final class FfmpegMediaSession implements MediaSession {
         }
 
         this.run = created;
-        startDurationProbe(req);
+        if (!req.live()) {
+            startDurationProbe(req);
+        }
         created.videoErrThread = MediaThreads.daemon("vstderr-" + created.id,
                 () -> drainStderr(videoProcess, created.videoStderr));
         created.videoErrThread.start();
@@ -776,7 +778,7 @@ public final class FfmpegMediaSession implements MediaSession {
     }
 
     /**
-     * 彻底拆掉一轮解码：杀进程、关管道、join 读线程。
+     * 彻底拆掉一轮解码：停声卡、杀进程、关管道、join 读线程。
      *
      * <p>必须先杀进程再关管道：读线程可能正阻塞在空管道的 {@code read} 上，
      * 只有进程退出才能让它返回，否则 close 会被拖到读写超时。</p>
@@ -916,7 +918,7 @@ public final class FfmpegMediaSession implements MediaSession {
         applyState(MediaState.ERROR, lastError);
     }
 
-    /** 探测片长；直播不进这里。探测线程是守护线程，关闭会话时会被一起销毁。 */
+    /** 探测片长；探测线程是守护线程，关闭会话时会被一起销毁。 */
     private void startDurationProbe(MediaRequest req) {
         String url = req.url();
         if (durationMs > 0L && Objects.equals(durationUrl, url)) {

@@ -48,6 +48,7 @@ public final class MikuVideoClient implements ClientModInitializer {
         media().engine().setPreferredPath(config.ffmpegPath);
         media().engine().setAutoDownload(config.autoDownloadFfmpeg);
         media().resolver().setDouyinApi(config.douyinApi);
+        resetScreenFailures();
         startFfmpegInit();
 
         ScreenRenderer.register();
@@ -110,6 +111,13 @@ public final class MikuVideoClient implements ClientModInitializer {
 
     public static MediaManager media() {
         return MediaManager.INSTANCE;
+    }
+
+    /** ffmpeg 可用性改善后调用：把因"找不到二进制"耗掉的屏幕失败额度放回去。 */
+    public static void resetScreenFailures() {
+        for (ClientScreen screen : ScreenRegistry.INSTANCE.all()) {
+            screen.resetFailures();
+        }
     }
 
     public static CredentialService credentials() {

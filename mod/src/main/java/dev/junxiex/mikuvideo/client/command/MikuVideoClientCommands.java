@@ -67,6 +67,7 @@ public final class MikuVideoClientCommands {
                                         config.save();
                                         MediaEngine engine = MikuVideoClient.media().engine();
                                         engine.setPreferredPath(path);
+                                        MikuVideoClient.resetScreenFailures();
                                         if (engine instanceof FfmpegMediaEngine ffmpegEngine) {
                                             ffmpegEngine.reload();
                                         }
@@ -99,6 +100,7 @@ public final class MikuVideoClientCommands {
                             ClientConfig config = MikuVideoClient.config();
                             config.ffmpegPath = binary.toString();
                             config.save();
+                            MikuVideoClient.resetScreenFailures();
                         }));
                         return 1;
                     }))

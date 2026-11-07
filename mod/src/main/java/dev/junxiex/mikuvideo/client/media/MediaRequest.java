@@ -17,6 +17,7 @@ import java.util.Map;
  * @param maxHeight           解码高度上限
  * @param fps                 解码帧率上限
  * @param audioEnabled        是否播放声音
+ * @param live                是否是直播流（直播不探测片长、不 seek）
  */
 public record MediaRequest(
         String url,
@@ -27,7 +28,8 @@ public record MediaRequest(
         int maxWidth,
         int maxHeight,
         int fps,
-        boolean audioEnabled
+        boolean audioEnabled,
+        boolean live
 ) {
     public MediaRequest {
         url = url == null ? "" : url;
@@ -43,7 +45,7 @@ public record MediaRequest(
     /** 兼容普通直链的构造方式：音频与视频同源、同请求头。 */
     public MediaRequest(String url, Map<String, String> headers, long startPositionMillis,
                         int maxWidth, int maxHeight, int fps, boolean audioEnabled) {
-        this(url, "", headers, Map.of(), startPositionMillis, maxWidth, maxHeight, fps, audioEnabled);
+        this(url, "", headers, Map.of(), startPositionMillis, maxWidth, maxHeight, fps, audioEnabled, false);
     }
 
     public String effectiveAudioUrl() {
