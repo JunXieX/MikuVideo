@@ -109,6 +109,11 @@ public final class ClientRegistry {
         }
     }
 
+    /** 已握手客户端数量，供 /mv admin stats 使用。 */
+    public int size() {
+        return clients.size();
+    }
+
     public Collection<Client> snapshot() {
         return List.copyOf(clients.values());
     }
