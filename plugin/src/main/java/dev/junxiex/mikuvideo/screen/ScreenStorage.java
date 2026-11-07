@@ -10,6 +10,8 @@ import dev.junxiex.mikuvideo.config.Settings;
 import dev.junxiex.mikuvideo.playback.PlaybackService;
 import dev.junxiex.mikuvideo.protocol.Playback;
 import dev.junxiex.mikuvideo.util.Tasks;
+import org.bukkit.Bukkit;
+import org.bukkit.World;
 import org.bukkit.plugin.Plugin;
 
 import java.io.IOException;
@@ -242,10 +244,14 @@ public final class ScreenStorage implements ScreenManager.Listener {
         return root;
     }
 
-    /** 旧版本把 World#getName()（world / world_nether）写进文件，读取时迁移成维度 key。 */
+    /** 旧版本把 World#getName()（level-name，可能被服主改过）写进文件，读取时迁移成维度 key。 */
     private static String normalizeWorld(String raw) {
         if (raw.isBlank() || raw.indexOf(':') > 0) {
             return raw;
+        }
+        World loaded = Bukkit.getWorld(raw);
+        if (loaded != null) {
+            return loaded.getKey().toString();
         }
         return switch (raw) {
             case "world" -> "minecraft:overworld";
@@ -365,6 +371,12 @@ public final class ScreenStorage implements ScreenManager.Listener {
         if (center == null || normal == null || right == null || up == null) {
             plugin.getLogger().warning("屏幕 " + id + " 的几何数据不完整，已跳过");
             return null;
+        }
+        // 旧数据里顶/底面屏幕的 up 向量是反的，按右手系重新归一，避免升级后画面上下镜像
+        if ((right[1] * up[2] - right[2] * up[1]) * normal[0]
+                + (right[2] * up[0] - right[0] * up[2]) * normal[1]
+                + (right[0] * up[1] - right[1] * up[0]) * normal[2] < 0.0D) {
+            up = new double[]{-up[0], -up[1], -up[2]};
         }
         Screen screen = new Screen(id, name, owner, world,
                 center[0], center[1], center[2],

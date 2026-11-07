@@ -135,18 +135,20 @@ public final class AdminCommands {
         if (!support.allow(source)) {
             return 0;
         }
-        List<Screen> removed = support.screens().removeWorld(world);
+        World target = Bukkit.getWorld(world);
+        String key = target == null ? world : target.getKey().toString();
+        List<Screen> removed = support.screens().removeWorld(key);
         for (Screen screen : removed) {
             support.playback().forget(screen.id());
         }
-        support.reply(source, "<green>已清理世界 " + world + " 的 " + removed.size() + " 块屏幕");
+        support.reply(source, "<green>已清理世界 " + key + " 的 " + removed.size() + " 块屏幕");
         return removed.isEmpty() ? 0 : 1;
     }
 
     private SuggestionProvider<CommandSourceStack> worldSuggestions() {
         return (context, builder) -> {
             for (World world : Bukkit.getWorlds()) {
-                builder.suggest(world.getName());
+                builder.suggest(world.getKey().toString());
             }
             return builder.buildFuture();
         };

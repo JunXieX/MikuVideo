@@ -148,7 +148,11 @@ public final class MikuVideoPlugin extends JavaPlugin {
         } catch (RuntimeException error) {
             getLogger().log(Level.SEVERE, "权限节点注册失败，分级限制可能不生效", error);
         }
-        startTimers();
+        try {
+            startTimers();
+        } catch (RuntimeException error) {
+            getLogger().log(Level.SEVERE, "定时任务重启失败，部分推送可能停摆", error);
+        }
         return true;
     }
 

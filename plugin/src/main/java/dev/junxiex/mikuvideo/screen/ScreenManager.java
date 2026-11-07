@@ -30,7 +30,8 @@ public final class ScreenManager {
     /** ID 长度：8 位小写 base36。 */
     public static final int ID_LENGTH = 8;
     private static final long ID_SPACE = 2821109907456L; // 36^8
-    private static final double DUPLICATE_DISTANCE = 1.0D;
+    /** 同一面但相邻方块的屏幕中心距恰好 1.0，阈值必须小于它，否则拼屏会被判成重复。 */
+    private static final double DUPLICATE_DISTANCE = 0.75D;
     private static final double DUPLICATE_NORMAL_DOT = 0.99D;
 
     /** 屏幕集合变更的监听者，广播与持久化都挂在这里。 */

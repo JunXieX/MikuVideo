@@ -147,10 +147,11 @@ public final class PacketListener implements PluginMessageListener {
             return;
         }
         long now = System.currentTimeMillis();
-        Long previous = lastSyncAt.put(player.getUniqueId(), now);
+        Long previous = lastSyncAt.get(player.getUniqueId());
         if (previous != null && now - previous < SYNC_REQUEST_COOLDOWN_MILLIS) {
             return;
         }
+        lastSyncAt.put(player.getUniqueId(), now);
         if (lastSyncAt.size() > MUTE_LIMIT) {
             lastSyncAt.entrySet().removeIf(entry -> now - entry.getValue() > SYNC_REQUEST_COOLDOWN_MILLIS);
         }
