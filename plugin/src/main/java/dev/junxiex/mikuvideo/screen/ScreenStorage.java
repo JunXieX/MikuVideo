@@ -242,6 +242,19 @@ public final class ScreenStorage implements ScreenManager.Listener {
         return root;
     }
 
+    /** 旧版本把 World#getName()（world / world_nether）写进文件，读取时迁移成维度 key。 */
+    private static String normalizeWorld(String raw) {
+        if (raw.isBlank() || raw.indexOf(':') > 0) {
+            return raw;
+        }
+        return switch (raw) {
+            case "world" -> "minecraft:overworld";
+            case "world_nether" -> "minecraft:the_nether";
+            case "world_the_end" -> "minecraft:the_end";
+            default -> "minecraft:" + raw;
+        };
+    }
+
     private JsonObject writeScreen(Screen screen, Playback state) {
         JsonObject object = new JsonObject();
         object.addProperty("id", screen.id());

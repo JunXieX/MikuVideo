@@ -199,7 +199,7 @@ public final class PacketListener implements PluginMessageListener {
             muted.entrySet().removeIf(entry -> entry.getValue() <= now);
         }
         muted.put(key, now + MUTE_MILLIS);
-        String detail = Text.plain(error.message(), Protocol.MAX_ERROR_MESSAGE);
+        String detail = Text.safe(error.message(), Protocol.MAX_ERROR_MESSAGE);
         plugin.getLogger().warning("客户端媒体错误：" + player.getName() + " 屏幕 " + error.screenId()
                 + " code=" + error.code() + " message=" + detail);
         Screen screen = screens.get(error.screenId()).orElse(null);
