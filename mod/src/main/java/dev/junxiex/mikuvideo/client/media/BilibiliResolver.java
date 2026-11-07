@@ -269,56 +269,129 @@ public final class BilibiliResolver implements MediaResolver {
         if (optInt(info, "live_status", 0) != 1) {
             throw new IOException("B 站直播间当前未开播");
         }
-        JsonObject play = data(client, "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo"
-                + "?room_id=" + roomId + "&protocol=0,1&format=0,1,2&codec=0,1&qn=10000", cookies);
-        JsonObject playurl = optObject(optObject(play, "playurl_info"), "playurl");
-        JsonArray streams = playurl == null ? null : playurl.getAsJsonArray("stream");
-        if (streams == null) {
-            throw new IOException("B 站直播流不可用");
-        }
+        long stamp = System.currentTimeMillis();
+        List<String> candidates = new ArrayList<>();
         String selected = "";
-        for (JsonElement streamElement : streams) {
-            JsonObject stream = streamElement.getAsJsonObject();
-            JsonArray formats = stream.getAsJsonArray("format");
-            if (formats == null) {
+        // 直播地址由 CDN 的 hot_cache 分发，偶尔会把已经轮换掉的流会话吐回来，
+        // 所以带一个时间戳穿透缓存，并且拿到候选后逐个探活，全死就再问一次。
+        for (int attempt = 0; attempt < 2 && selected.isBlank(); attempt++) {
+            JsonObject play = data(client, "https://api.live.bilibili.com/xlive/web-room/v2/index/getRoomPlayInfo"
+                    + "?room_id=" + roomId + "&protocol=0,1&format=0,1,2&codec=0,1&qn=10000"
+                    + "&platform=web&ptype=8&dolby=5&panorama=1&_=" + (stamp + attempt), cookies);
+            candidates.clear();
+            collectLiveCandidates(play, stamp, candidates);
+            if (candidates.isEmpty()) {
                 continue;
             }
-            for (JsonElement formatElement : formats) {
-                JsonArray codecs = formatElement.getAsJsonObject().getAsJsonArray("codec");
-                if (codecs == null) {
-                    continue;
-                }
-                for (JsonElement codecElement : codecs) {
-                    JsonObject codec = codecElement.getAsJsonObject();
-                    String base = optString(codec, "base_url");
-                    JsonArray urlInfo = codec.getAsJsonArray("url_info");
-                    if (base.isBlank() || urlInfo == null || urlInfo.isEmpty()) {
-                        continue;
-                    }
-                    JsonObject infoEntry = urlInfo.get(0).getAsJsonObject();
-                    String host = optString(infoEntry, "host");
-                    String extra = optString(infoEntry, "extra");
-                    if (!host.isBlank()) {
-                        selected = host + base + extra;
-                        break;
-                    }
-                }
-                if (!selected.isBlank()) {
-                    break;
-                }
-            }
-            if (!selected.isBlank()) {
-                break;
-            }
+            selected = firstPlayable(client, candidates);
         }
         if (selected.isBlank()) {
-            throw new IOException("B 站直播没有可用的 HTTP 流");
+            throw new IOException(candidates.isEmpty()
+                    ? "B 站直播没有可用的 HTTP 流"
+                    : "B 站直播流地址已失效（" + candidates.size() + " 个候选均无响应）");
         }
         Map<String, String> headers = Map.of(
                 "Referer", "https://live.bilibili.com/" + roomId,
                 "User-Agent", UA,
                 "Origin", "https://live.bilibili.com");
         return new ResolvedMedia(selected, "", headers, Map.of(), 0L, title, true);
+    }
+
+    /** 收集直播候选地址：覆盖全部 stream / format / codec / url_info，跳过已过期的地址。 */
+    private static void collectLiveCandidates(JsonObject play, long nowMillis, List<String> output) {
+        JsonObject playurl = optObject(optObject(play, "playurl_info"), "playurl");
+        JsonArray streams = playurl == null ? null : playurl.getAsJsonArray("stream");
+        if (streams == null) {
+            return;
+        }
+        long nowSeconds = nowMillis / 1000L;
+        for (JsonElement streamElement : streams) {
+            if (!streamElement.isJsonObject()) {
+                continue;
+            }
+            JsonArray formats = streamElement.getAsJsonObject().getAsJsonArray("format");
+            if (formats == null) {
+                continue;
+            }
+            for (JsonElement formatElement : formats) {
+                if (!formatElement.isJsonObject()) {
+                    continue;
+                }
+                JsonArray codecs = formatElement.getAsJsonObject().getAsJsonArray("codec");
+                if (codecs == null) {
+                    continue;
+                }
+                for (JsonElement codecElement : codecs) {
+                    if (!codecElement.isJsonObject()) {
+                        continue;
+                    }
+                    JsonObject codec = codecElement.getAsJsonObject();
+                    String base = optString(codec, "base_url");
+                    JsonArray urlInfo = codec.getAsJsonArray("url_info");
+                    if (base.isBlank() || urlInfo == null) {
+                        continue;
+                    }
+                    for (JsonElement entryElement : urlInfo) {
+                        if (!entryElement.isJsonObject()) {
+                            continue;
+                        }
+                        JsonObject entry = entryElement.getAsJsonObject();
+                        String host = optString(entry, "host");
+                        if (host.isBlank()) {
+                            continue;
+                        }
+                        String url = host + base + optString(entry, "extra");
+                        if (output.contains(url) || liveUrlExpired(url, nowSeconds)) {
+                            continue;
+                        }
+                        output.add(url);
+                    }
+                }
+            }
+        }
+    }
+
+    /** 地址里自带的 expires 早于当前时间就直接丢弃。 */
+    private static boolean liveUrlExpired(String url, long nowSeconds) {
+        Matcher matcher = Pattern.compile("[?&]expires=(\\d+)").matcher(url);
+        if (!matcher.find()) {
+            return false;
+        }
+        try {
+            return Long.parseLong(matcher.group(1)) <= nowSeconds;
+        } catch (NumberFormatException ignored) {
+            return false;
+        }
+    }
+
+    /**
+     * 依次探活，返回第一个可用的地址。
+     *
+     * <p>用 HEAD 只问状态码，不落一个字节的流数据；CDN 不理 HEAD 返回 405 视为存活。
+     * 探测全部失败但都是网络异常时，退回第一个候选，交给播放层去试一次。</p>
+     */
+    private static String firstPlayable(HttpClient client, List<String> candidates) {
+        String fallback = "";
+        for (String candidate : candidates) {
+            try {
+                HttpRequest probe = HttpRequest.newBuilder(URI.create(candidate))
+                        .timeout(Duration.ofSeconds(4))
+                        .method("HEAD", HttpRequest.BodyPublishers.noBody())
+                        .header("User-Agent", UA)
+                        .header("Referer", REFERER)
+                        .header("Origin", "https://live.bilibili.com")
+                        .build();
+                int code = client.send(probe, HttpResponse.BodyHandlers.discarding()).statusCode();
+                if (code == 200 || code == 206 || code == 405) {
+                    return candidate;
+                }
+            } catch (Exception ignored) {
+                if (fallback.isEmpty()) {
+                    fallback = candidate;
+                }
+            }
+        }
+        return fallback;
     }
 
     /** 解析 playurl 的 dash/durl。 */

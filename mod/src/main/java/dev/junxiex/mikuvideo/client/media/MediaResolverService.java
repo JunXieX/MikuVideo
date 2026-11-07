@@ -126,7 +126,7 @@ public final class MediaResolverService {
             if (douyin.supports(url)) {
                 try {
                     ResolvedMedia media = douyin.resolve(url, cookies, maxHeight, proxy);
-                    cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
+                    remember(key, media);
                     return media;
                 } catch (Exception error) {
                     nativeFailure = error;
@@ -135,7 +135,7 @@ public final class MediaResolverService {
             if (bilibili.supports(url)) {
                 try {
                     ResolvedMedia media = bilibili.resolve(url, cookies, serverCookie, maxHeight, proxy);
-                    cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
+                    remember(key, media);
                     return media;
                 } catch (Exception error) {
                     nativeFailure = error;
@@ -147,6 +147,14 @@ public final class MediaResolverService {
             }
             return direct(url);
         }, executor);
+    }
+
+    /** 直播地址带时效且会被 CDN 轮换，不能进缓存；点播缓存 5 分钟。 */
+    private void remember(String key, ResolvedMedia media) {
+        if (media.live()) {
+            return;
+        }
+        cache.put(key, new Cached(media, System.currentTimeMillis() + CACHE_MILLIS));
     }
 
     public void shutdown() {

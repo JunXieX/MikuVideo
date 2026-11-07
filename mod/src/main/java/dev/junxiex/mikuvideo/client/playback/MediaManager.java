@@ -205,6 +205,11 @@ public final class MediaManager {
         if (session.state() == MediaState.ERROR && screen.failureCount() < 3
                 && screen.lastFailureAt() + 10_000L < System.currentTimeMillis()) {
             close(info.id());
+            // 直播地址会过期或被 CDN 轮换，缓存下来的解析结果不能直接复用，丢掉后重新解析
+            if (resolved != null && resolved.live()) {
+                screen.clearResolved();
+                screen.resetFailures();
+            }
             return;
         }
         long duration = session.durationMillis();
