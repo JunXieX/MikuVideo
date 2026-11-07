@@ -5,6 +5,7 @@ import dev.junxiex.mikuvideo.client.command.MikuVideoClientCommands;
 import dev.junxiex.mikuvideo.client.config.ClientConfig;
 import dev.junxiex.mikuvideo.client.credential.CredentialService;
 import dev.junxiex.mikuvideo.client.interact.ScreenPicker;
+import dev.junxiex.mikuvideo.client.media.FfmpegMediaEngine;
 import dev.junxiex.mikuvideo.client.playback.MediaManager;
 import dev.junxiex.mikuvideo.client.net.ClientNetworking;
 import dev.junxiex.mikuvideo.client.net.ClockSync;
@@ -124,7 +125,8 @@ public final class MikuVideoClient implements ClientModInitializer {
         ScreenRegistry.INSTANCE.uploadFrames(minecraft);
         media().tick(minecraft);
         // 定位还没跑完时不要在这里触发扫描：主线程不能等锁
-        if (!warnedMissingFfmpeg && media().engine().locator().isResolved() && !media().engine().isAvailable()) {
+        if (!warnedMissingFfmpeg && media().engine() instanceof FfmpegMediaEngine ffmpegEngine
+                && ffmpegEngine.locator().isResolved() && !ffmpegEngine.isAvailable()) {
             warnedMissingFfmpeg = true;
             chat("未找到 ffmpeg，视频无法解码。安装 ffmpeg 后执行 /mikuvideo-client reload，或执行 /mikuvideo-client download 自动下载，或用 /mikuvideo-client ffmpeg <路径> 指定。");
         }
