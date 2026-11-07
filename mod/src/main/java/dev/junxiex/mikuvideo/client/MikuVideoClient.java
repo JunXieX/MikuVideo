@@ -123,7 +123,8 @@ public final class MikuVideoClient implements ClientModInitializer {
         }
         ScreenRegistry.INSTANCE.uploadFrames(minecraft);
         media().tick(minecraft);
-        if (!warnedMissingFfmpeg && !media().engine().isAvailable()) {
+        // 定位还没跑完时不要在这里触发扫描：主线程不能等锁
+        if (!warnedMissingFfmpeg && media().engine().locator().isResolved() && !media().engine().isAvailable()) {
             warnedMissingFfmpeg = true;
             chat("未找到 ffmpeg，视频无法解码。安装 ffmpeg 后执行 /mikuvideo-client reload，或执行 /mikuvideo-client download 自动下载，或用 /mikuvideo-client ffmpeg <路径> 指定。");
         }

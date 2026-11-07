@@ -99,6 +99,12 @@ public final class FfmpegMediaEngine implements MediaEngine {
         return future != null && !future.isDone();
     }
 
+    /** 自动下载的完成信号；没有下载任务时返回已完成的 future。 */
+    public CompletableFuture<Path> downloadFuture() {
+        CompletableFuture<Path> future = autoDownloadFuture;
+        return future == null ? CompletableFuture.completedFuture(null) : future;
+    }
+
     /** 清空定位缓存，下次使用时重新按顺序探测。 */
     public void reload() {
         locator.reload();

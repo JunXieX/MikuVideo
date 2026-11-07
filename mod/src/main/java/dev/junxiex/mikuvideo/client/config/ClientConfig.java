@@ -46,12 +46,21 @@ public final class ClientConfig {
                     config = loaded;
                 }
             } catch (Exception e) {
-                MikuVideoClient.LOGGER.warn("读取客户端配置失败，使用默认值: {}", e.getMessage());
+                MikuVideoClient.LOGGER.warn("读取客户端配置失败，已备份原文件并使用默认值: {}", e.getMessage());
+                backupBroken();
             }
         }
         config.validate();
         config.save();
         return config;
+    }
+
+    /** 解析失败时先留一份原件，避免默认值把玩家原本的设置直接覆盖掉。 */
+    private static void backupBroken() {
+        try {
+            Files.move(file, file.resolveSibling("mikuvideo.json.broken"), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        } catch (Exception ignored) {
+        }
     }
 
     public void validate() {

@@ -43,10 +43,11 @@ public final class ClientUrls {
             return false;
         }
         if (value.contains(":")) {
-            int mapped = value.lastIndexOf("::ffff:");
-            if (mapped >= 0) {
-                String tail = value.substring(mapped + 7);
-                // IPv4 映射地址按内嵌的 IPv4 判定；十六进制写法无法可靠还原，直接当内网
+            // 只有整段就是 v4-mapped（::ffff:a.b.c.d）时才按内嵌 IPv4 判定；
+            // fe80::ffff:8.8.8.8 这类是链路本地地址，交给 IPv6 规则拒绝。
+            boolean mapped = value.startsWith("::ffff:") || value.startsWith("0:0:0:0:0:ffff:");
+            if (mapped) {
+                String tail = value.substring(value.lastIndexOf("ffff:") + 5);
                 return tail.contains(".") && isPublicIpv4(tail);
             }
             return isPublicIpv6(value);

@@ -57,11 +57,13 @@ public final class ClientNetworking {
     }
 
     private static void sendHello() {
+        // 先推进计数再判通道：服务端没装插件时 canSend 恒为 false，
+        // 不推进就会每 tick 重试到玩家退出世界。
+        lastHelloAt = System.currentTimeMillis();
+        helloAttempts++;
         if (!ClientPlayNetworking.canSend(ModPayload.TYPE)) {
             return;
         }
-        lastHelloAt = System.currentTimeMillis();
-        helloAttempts++;
         send(new Message.HelloC2S(Protocol.VERSION, modVersion(), lastHelloAt));
     }
 

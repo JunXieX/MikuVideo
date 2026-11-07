@@ -893,6 +893,13 @@ public final class FfmpegMediaSession implements MediaSession {
     private void reportUnavailable() {
         if (engine.isDownloading()) {
             applyState(MediaState.PREPARING, "正在下载 ffmpeg…");
+            // 下载结束时在控制线程上重试一次，否则这块屏幕会一直停在准备态
+            engine.downloadFuture().whenComplete((binary, error) ->
+                    submit("ffmpeg-ready", () -> {
+                        if (!closed && run == null && request != null) {
+                            launch(request, basePositionMs);
+                        }
+                    }));
             return;
         }
         reportMissingFfmpeg();
