@@ -26,8 +26,6 @@ public final class Permissions {
     public static final String MANAGE_OTHERS = "mikuvideo.manage.others";
     public static final String ADMIN = "mikuvideo.admin";
     public static final String LIMIT_UNLIMITED = "mikuvideo.limit.unlimited";
-    /** 允许从服务端获取 B 站凭证；默认关闭，由服主按需授予。 */
-    public static final String BILIBILI_COOKIE = "mikuvideo.bilibili.cookie";
 
     private record Node(String name, String description, PermissionDefault defaultValue) {
     }
@@ -38,8 +36,7 @@ public final class Permissions {
             new Node(MANAGE_OWN, "允许管理自己的屏幕", PermissionDefault.TRUE),
             new Node(MANAGE_OTHERS, "允许管理其他玩家的屏幕", PermissionDefault.OP),
             new Node(ADMIN, "允许使用管理子命令", PermissionDefault.OP),
-            new Node(LIMIT_UNLIMITED, "不受单玩家屏幕数量限制", PermissionDefault.OP),
-            new Node(BILIBILI_COOKIE, "允许从服务端获取 B 站凭证", PermissionDefault.FALSE));
+            new Node(LIMIT_UNLIMITED, "不受单玩家屏幕数量限制", PermissionDefault.OP));
 
     private static final Set<String> extraRegistered = ConcurrentHashMap.newKeySet();
 

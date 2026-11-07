@@ -17,7 +17,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 - **服务端权威时间线**：所有人按同一时间点播放，每 5 秒纠偏，晚进服自动追上进度。
 - **播放队列**：每块屏幕独立队列，播完自动切下一项，**重启后队列仍在**。
 - **循环播放**：单屏开关，播到结尾自动从头开始；命令与图形菜单都能控制。
-- **B 站凭证下发**：服主把 Cookie 写进服务端配置，按权限下发给玩家；客户端 AES-GCM 加密保存，绑定服务器与机器，换服无法复用。
+- **B 站凭证下发**：服主把 Cookie 写进服务端配置，玩家进服后自动下发；客户端 AES-GCM 加密保存，绑定服务器与机器，换服无法复用。
 - **分级屏幕权限**：按权限配置每位玩家能创建的屏幕数量、最大尺寸与允许比例，等级只能收紧全局上限。
 - **客户端本地解码**：内置 FFmpeg 9.0（Windows/Linux x64），子进程解码，不占服务端资源。
 - **解码预算**：同时解码屏幕数、分辨率、帧率、码率上限均可配；看不见的屏幕自动停解码。
@@ -39,7 +39,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.0.6.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.0.7.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -49,7 +49,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.0.6.jar` 放进 `mods/`。
+2. 把 `MikuVideo-Client-1.0.7.jar` 放进 `mods/`。
 3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
@@ -90,11 +90,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `media.allowed-header-names` | Referer, User-Agent, Origin, Cookie, Authorization | 允许透传的请求头 |
 | `bilibili.cookie` | 空 | 服务端持有的 B 站 Cookie；留空不分发 |
 | `bilibili.deliver-to-clients` | true | 是否允许下发给客户端 |
-| `bilibili.require-online-mode` | true | 要求服务端正版验证；离线服需显式打开 `allow-offline-mode` |
-| `bilibili.allow-offline-mode` | false | 离线模式是否仍下发（不推荐） |
 | `bilibili.deliver-delay-ms` | 1500 | 进服后延迟下发时间（毫秒） |
-| `bilibili.refresh-cooldown-ms` | 600000 | 同一玩家主动刷新的最小间隔 |
-| `bilibili.max-deliveries-per-hour` | 6 | 同一玩家每小时最多获取次数 |
 | `bilibili.credential-ttl-hours` | 168 | 客户端凭证有效期（小时） |
 | `storage.save-debounce-ms` | 1500 | 合并写盘延迟（毫秒） |
 | `messages.*` | 见文件 | 提示文案，支持 MiniMessage |
@@ -160,7 +156,6 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `mikuvideo.manage.others` | OP | 管理其他玩家的屏幕 |
 | `mikuvideo.admin` | OP | 管理子命令 |
 | `mikuvideo.limit.unlimited` | OP | 不受单玩家数量限制 |
-| `mikuvideo.bilibili.cookie` | 无 | 允许获取服务端 B 站凭证；默认关闭，需服主授予 |
 | `mikuvideo.tier.<等级>` | 无 | 配置里声明的屏幕等级权限，默认关闭 |
 
 ## 视频源说明
@@ -202,23 +197,18 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 bilibili:
   cookie: 'SESSDATA=xxx; bili_jct=xxx; buvid3=xxx'
   deliver-to-clients: true
-  require-online-mode: true
-  max-deliveries-per-hour: 6
+  deliver-delay-ms: 1500
+  credential-ttl-hours: 168
 ```
 
-玩家需要 `mikuvideo.bilibili.cookie` 权限（默认关闭）：
-
-```text
-/lp user <玩家> permission set mikuvideo.bilibili.cookie true
-```
+凭证会对**所有进服玩家**下发；建议使用专用 B 站账号，避免影响主账号。
 
 安全设计：
 
 - Cookie 只存在于服务端配置，命令与日志都不会打印它的值。
-- 下发前校验权限、正版验证与频率（每人每小时 6 次、刷新间隔 10 分钟）。
 - 客户端用 AES-256-GCM 加密保存到 `config/mikuvideo-credentials.json`，密钥由机器指纹派生；文件复制到别的机器无法解密。
 - 凭证同时绑定服务端 `server-id.txt` 的 ID 与服务器地址哈希，换服后自动失效。
-- 默认有效期 7 天，过期后客户端自动续期一次；玩家可用 `/mikuvideo-client credential clear` 主动清除。
+- 默认有效期 7 天，过期后客户端自动重新获取；玩家可用 `/mikuvideo-client credential clear` 主动清除。
 
 ### 屏幕等级与尺寸限制
 

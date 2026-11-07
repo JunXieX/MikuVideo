@@ -166,18 +166,14 @@ public record Settings(Limits limits, SyncSettings sync, Media media, Bilibili b
      * <p>Cookie 只保存在服务端配置里，按玩家权限与风控规则下发；
      * 客户端负责加密落盘并绑定当前服务器。</p>
      */
-    public record Bilibili(String cookie, boolean deliverToClients, boolean requireOnlineMode,
-                           boolean allowOfflineMode, long deliverDelayMs, long refreshCooldownMs,
-                           int maxDeliveriesPerHour, long credentialTtlMillis) {
+    public record Bilibili(String cookie, boolean deliverToClients, long deliverDelayMs,
+                           long credentialTtlMillis) {
 
-        public static final Bilibili DEFAULTS = new Bilibili("", true, true, false,
-                1500L, 600000L, 6, 7L * 24L * 3600L * 1000L);
+        public static final Bilibili DEFAULTS = new Bilibili("", true, 1500L, 7L * 24L * 3600L * 1000L);
 
         public Bilibili {
             cookie = sanitizeCookie(cookie);
             deliverDelayMs = clamp(deliverDelayMs, 0L, 60000L);
-            refreshCooldownMs = clamp(refreshCooldownMs, 5000L, 86_400_000L);
-            maxDeliveriesPerHour = clamp(maxDeliveriesPerHour, 1, 60);
             credentialTtlMillis = clamp(credentialTtlMillis, 60_000L, 365L * 24L * 3600L * 1000L);
         }
 
@@ -279,11 +275,7 @@ public record Settings(Limits limits, SyncSettings sync, Media media, Bilibili b
         Bilibili bilibili = new Bilibili(
                 root.getString("bilibili.cookie", ""),
                 boolOf(root, "bilibili.deliver-to-clients", true),
-                boolOf(root, "bilibili.require-online-mode", true),
-                boolOf(root, "bilibili.allow-offline-mode", false),
                 longOf(root, "bilibili.deliver-delay-ms", 1500L, 0L, 60000L),
-                longOf(root, "bilibili.refresh-cooldown-ms", 600000L, 5000L, 86400000L),
-                intOf(root, "bilibili.max-deliveries-per-hour", 6, 1, 60),
                 longOf(root, "bilibili.credential-ttl-hours", 168L, 1L, 8760L) * 3600000L);
 
         StorageSettings storage = new StorageSettings(

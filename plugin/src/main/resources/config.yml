@@ -81,16 +81,9 @@ bilibili:
   cookie: ''
   # 是否允许下发（关闭后即使配置了 Cookie 也不会发给客户端）
   deliver-to-clients: true
-  # 要求服务端开启正版验证；离线模式服请显式打开 allow-offline-mode
-  require-online-mode: true
-  allow-offline-mode: false
   # 玩家进服后延迟多久下发（毫秒），给客户端留出握手时间
   deliver-delay-ms: 1500
-  # 同一玩家两次主动刷新之间的最小间隔（毫秒）
-  refresh-cooldown-ms: 600000
-  # 同一玩家每小时最多获取次数
-  max-deliveries-per-hour: 6
-  # 客户端凭证有效期（小时），到期后需重新获取
+  # 客户端凭证有效期（小时），到期后自动重新获取
   credential-ttl-hours: 168
 
 storage:

@@ -128,7 +128,6 @@ public final class AdminCommands {
         }
         support.reply(source, "<gray>—— B 站凭证 ——");
         support.reply(source, "<gray>" + support.plugin().cookieService().statusText());
-        support.reply(source, "<gray>获取权限：<white>" + Permissions.BILIBILI_COOKIE + "</white>（默认关闭）");
         return 1;
     }
 
