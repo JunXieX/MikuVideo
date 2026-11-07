@@ -43,7 +43,7 @@ public final class ScreenCommands {
     public void attach(LiteralArgumentBuilder<CommandSourceStack> root) {
         root.then(Commands.literal("create")
                 .requires(source -> source.getSender().hasPermission(Permissions.CREATE))
-                .then(Commands.argument("name", StringArgumentType.greedyString())
+                .then(Commands.argument("name", StringArgumentType.string())
                         .executes(context -> create(context, null, null))
                         .then(Commands.argument("width", DoubleArgumentType.doubleArg(0.1D, 64.0D))
                                 .executes(context -> create(context, DoubleArgumentType.getDouble(context, "width"), null))
@@ -58,7 +58,7 @@ public final class ScreenCommands {
 
         root.then(Commands.literal("rename")
                 .then(screenArgument("screen")
-                        .then(Commands.argument("name", StringArgumentType.greedyString())
+                        .then(Commands.argument("name", StringArgumentType.string())
                                 .executes(context -> rename(context.getSource(),
                                         StringArgumentType.getString(context, "screen"),
                                         StringArgumentType.getString(context, "name"))))));
@@ -116,21 +116,29 @@ public final class ScreenCommands {
         return 1;
     }
 
-    private void createNow(Player player, CommandSourceStack source, String rawName, Double width, Double height) {
-        String name = Text.trim(rawName, Protocol.MAX_SCREEN_NAME);
+    /** 名称会拼进 MiniMessage 输出，标签字符必须挡在入库之前，否则管理员点一下就等于执行。 */
+    private static String validateName(String name) {
         if (name.isEmpty()) {
-            support.error(source, "屏幕名称不能为空");
-            return;
+            return "屏幕名称不能为空";
         }
         if (Text.utf8Length(name) > Protocol.MAX_SCREEN_NAME) {
-            support.error(source, "名称过长，最多 " + Protocol.MAX_SCREEN_NAME + " 字节（约 21 个汉字）");
-            return;
+            return "名称过长，最多 " + Protocol.MAX_SCREEN_NAME + " 字节（约 21 个汉字）";
         }
         for (int i = 0; i < name.length(); i++) {
-            if (Character.isISOControl(name.charAt(i))) {
-                support.error(source, "屏幕名称包含非法字符");
-                return;
+            char c = name.charAt(i);
+            if (Character.isISOControl(c) || c == '<' || c == '>') {
+                return "屏幕名称包含非法字符";
             }
+        }
+        return null;
+    }
+
+    private void createNow(Player player, CommandSourceStack source, String rawName, Double width, Double height) {
+        String name = Text.trim(rawName, Protocol.MAX_SCREEN_NAME);
+        String nameError = validateName(name);
+        if (nameError != null) {
+            support.error(source, nameError);
+            return;
         }
         Optional<ScreenGeometry.Hit> hit = ScreenGeometry.look(player);
         if (hit.isEmpty()) {
@@ -188,12 +196,9 @@ public final class ScreenCommands {
             return 0;
         }
         String name = Text.trim(rawName, Protocol.MAX_SCREEN_NAME);
-        if (name.isEmpty()) {
-            support.error(source, "名称不能为空");
-            return 0;
-        }
-        if (Text.utf8Length(name) > Protocol.MAX_SCREEN_NAME) {
-            support.error(source, "名称过长，最多 " + Protocol.MAX_SCREEN_NAME + " 字节（约 21 个汉字）");
+        String nameError = validateName(name);
+        if (nameError != null) {
+            support.error(source, nameError);
             return 0;
         }
         support.screens().replace(screen.withName(name));

@@ -257,7 +257,8 @@ public final class ScreenStorage implements ScreenManager.Listener {
             case "world" -> "minecraft:overworld";
             case "world_nether" -> "minecraft:the_nether";
             case "world_the_end" -> "minecraft:the_end";
-            default -> "minecraft:" + raw;
+            // 不猜：猜出的 key 含 ':'，下次启动会被当成已迁移直接固化进文件
+            default -> "";
         };
     }
 

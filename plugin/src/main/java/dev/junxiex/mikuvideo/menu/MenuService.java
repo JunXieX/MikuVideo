@@ -271,8 +271,6 @@ public final class MenuService {
         player.showDialog(dialog);
     }
 
-    // ---------------------------------------------------------------- 管理页
-
     // ---------------------------------------------------------------- 动作
 
     private void togglePlayback(Player player, String screenId, DialogResponseView response) {
