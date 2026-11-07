@@ -173,6 +173,10 @@ public final class Urls {
             byte[] ipv6 = parseIpv6(value);
             return ipv6 != null && isPrivateIpv6(ipv6);
         }
+        byte[] numeric = parseNumericIpv4(value);
+        if (numeric != null) {
+            return isPrivateIpv4(numeric);
+        }
         byte[] ipv4 = parseIpv4(value);
         return ipv4 != null && isPrivateIpv4(ipv4);
     }
@@ -272,6 +276,44 @@ public final class Urls {
             return isPrivateIpv4(embedded);
         }
         return false;
+    }
+
+    /**
+     * inet_aton 的省略写法：`2130706433`、`127.1` 都会被系统解析成 127.0.0.1，
+     * 因此只由数字与点组成的主机名按 1~4 段展开成 4 字节再判定。
+     */
+    private static byte[] parseNumericIpv4(String host) {
+        String[] parts = host.split("\\.", -1);
+        if (parts.length < 1 || parts.length > 4) {
+            return null;
+        }
+        long[] values = new long[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            String part = parts[i];
+            if (part.isEmpty() || part.length() > 10) {
+                return null;
+            }
+            long value = 0;
+            for (int j = 0; j < part.length(); j++) {
+                char c = part.charAt(j);
+                if (c < '0' || c > '9') {
+                    return null;
+                }
+                value = value * 10 + (c - '0');
+            }
+            values[i] = value;
+        }
+        long address;
+        switch (values.length) {
+            case 1 -> address = values[0];
+            case 2 -> address = (values[0] << 24) | values[1];
+            case 3 -> address = (values[0] << 24) | (values[1] << 16) | values[2];
+            default -> address = (values[0] << 24) | (values[1] << 16) | (values[2] << 8) | values[3];
+        }
+        if (address < 0 || address > 0xFFFFFFFFL) {
+            return null;
+        }
+        return new byte[]{(byte) (address >> 24), (byte) (address >> 16), (byte) (address >> 8), (byte) address};
     }
 
     private static byte[] parseIpv4(String host) {

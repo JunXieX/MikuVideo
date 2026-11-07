@@ -40,7 +40,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 
 ### 服务端
 
-1. 把 `MikuVideo-1.1.0.jar` 放进 `plugins/`。
+1. 把 `MikuVideo-1.2.0.jar` 放进 `plugins/`。
 2. 重启服务器。首次启动会生成：
    - `plugins/MikuVideo/config.yml`
    - `plugins/MikuVideo/screens.json`（首次保存屏幕后出现）
@@ -50,7 +50,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 ### 客户端
 
 1. 安装 Fabric Loader 0.20.1+ 与 Fabric API（Fabric 生态的 Mod 级前置，无法安全内置，否则会与玩家已安装的版本冲突）。
-2. 把 `MikuVideo-Client-1.1.0.jar` 放进 `mods/`。
+2. 把 `MikuVideo-Client-1.2.0.jar` 放进 `mods/`。
 3. **FFmpeg 已内置**：Windows x64 / Linux x64 首次播放时会自动解压到 `.minecraft/mikuvideo/ffmpeg/bundled-1/`，不需要手动安装。
    - macOS 与其他架构：安装到系统 PATH，或执行 `/mikuvideo-client ffmpeg <路径>`，或 `/mikuvideo-client download`（Windows/Linux）。
    - 想改用自带的 FFmpeg：把可执行文件放到 `.minecraft/mikuvideo/ffmpeg/ffmpeg.exe`，优先级高于内置包。
@@ -106,7 +106,7 @@ MikuVideo 让服务器里的玩家创建属于自己的“屏幕”，在游戏�
 | `/mv menu` | 打开屏幕列表菜单 |
 | `/mv list [页码]` | 列出可管理的屏幕 |
 | `/mv info <屏幕>` | 查看屏幕详情 |
-| `/mv create <名称> [宽] [高]` | 看向方块面创建屏幕 |
+| `/mv create <名称> [宽] [高]`（中文名请加引号） | 看向方块面创建屏幕 |
 | `/mv remove <屏幕>` | 删除屏幕 |
 | `/mv rename <屏幕> <名称>` | 重命名 |
 | `/mv size <屏幕> <宽> <高>` | 调整尺寸 |
